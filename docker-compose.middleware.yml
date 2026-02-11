@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: pegasus-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: pegasus
+      MYSQL_USER: pegasus
+      MYSQL_PASSWORD: pegasus_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - /volume2/dockerVolume/pegasus-midware/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - pegasus-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: pegasus-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - /volume2/dockerVolume/pegasus-midware/redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    networks:
+      - pegasus-net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    container_name: pegasus-es
+    environment:
+      - node.name=pegasus-es
+      - cluster.name=pegasus-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - /volume2/dockerVolume/pegasus-midware/es_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - pegasus-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  mysql_data:
+  redis_data:
+  es_data:
+
+networks:
+  pegasus-net:
+    driver: bridge

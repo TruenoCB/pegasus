@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.DS_Store
+coverage
+.idea
+.vscode
+*.log
+mysql_data
+redis_data
+es_data
