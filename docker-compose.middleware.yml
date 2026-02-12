@@ -50,7 +50,7 @@ services:
         soft: -1
         hard: -1
     volumes:
-      - /volume2/dockerVolume/pegasus-midware/es_data:/usr/share/elasticsearch/data
+      - es_data_v2:/usr/share/elasticsearch/data
     ports:
       - "9200:9200"
     networks:
