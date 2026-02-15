@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"pegasus/internal/config"
-	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -42,7 +41,7 @@ func (s *ESService) IndexSummary(id, title, summary, url string) error {
 		"title":     title,
 		"summary":   summary,
 		"url":       url,
-		"timestamp":  "now",
+		"timestamp": "now",
 	}
 
 	data, err := json.Marshal(doc)

@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: pegasus-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=pegasus:pegasus_password@tcp(pegasus-mysql:3306)/pegasus?charset=utf8mb4&parseTime=True&loc=Local
+      - REDIS_URL=pegasus-redis:6379
+      - ELASTICSEARCH_URL=http://pegasus-es:9200
+      - JWT_SECRET=prod_secret_key
+      - PORT=8080
+      # AI Config (Override in .env)
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - AI_BASE_URL=${AI_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_MODEL=${AI_MODEL:-gpt-3.5-turbo}
+    networks:
+      - pegasus-net
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: pegasus-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    networks:
+      - pegasus-net
+    depends_on:
+      - backend
+
+# Dummy services to wait for middleware if running together, 
+# or just rely on external network if running separately.
+# Since we use external network, we don't define mysql/redis services here directly 
+# but we reference them in depends_on which requires them to be in the same compose file usually.
+# However, for split compose files, depends_on for external services doesn't work directly.
+# We will remove depends_on for external services and assume user started middleware first.
+
+networks:
+  pegasus-net:
+    external: true

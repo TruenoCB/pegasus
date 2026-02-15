@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"net/http"
+	"pegasus/internal/services"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pegasus/backend/internal/services"
 )
 
 type AuthHandler struct {
@@ -62,4 +62,20 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"user":  user,
 		"token": token,
 	})
+}
+
+func (h *AuthHandler) Me(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	user, err := h.authService.GetProfile(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
 }

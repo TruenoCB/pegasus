@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # The All-in-One App Container
+  pegasus:
+    build:
+      context: ../../
+      dockerfile: deploy/aio/Dockerfile
+    container_name: pegasus-aio
+    restart: always
+    ports:
+      - "80:80"    # Frontend
+      # - "8080:8080" # Backend (Optional, exposed via Nginx /api)
+    environment:
+      - DATABASE_URL=pegasus:pegasus_password@tcp(mysql:3306)/pegasus?charset=utf8mb4&parseTime=True&loc=Local
+      - REDIS_URL=redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - JWT_SECRET=${JWT_SECRET:-prod_secret_key}
+      - PORT=8080
+      
+      # AI Config
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - AI_BASE_URL=${AI_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_MODEL=${AI_MODEL:-gpt-3.5-turbo}
+
+      # SMTP Config
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - pegasus-net
+
+  # Middleware Services (Bundled here for convenience in AIO mode)
+  mysql:
+    image: mysql:8.0
+    container_name: pegasus-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: pegasus
+      MYSQL_USER: pegasus
+      MYSQL_PASSWORD: pegasus_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - pegasus-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: pegasus-redis
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    networks:
+      - pegasus-net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    container_name: pegasus-es
+    environment:
+      - node.name=pegasus-es
+      - cluster.name=pegasus-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - pegasus-net
+
+volumes:
+  mysql_data:
+  redis_data:
+  es_data:
+
+networks:
+  pegasus-net:
+    driver: bridge

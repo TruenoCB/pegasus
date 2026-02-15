@@ -29,17 +29,28 @@ type Asset struct {
 	Metadata    string    `gorm:"type:json" json:"metadata"` // Stored as JSON string
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	RSSGroup    RSSGroup  `gorm:"foreignKey:AssetID" json:"rss_group,omitempty"`
 }
 
 type RSSGroup struct {
-	ID              string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
-	AssetID         string    `gorm:"type:varchar(36);not null;index" json:"asset_id"`
-	Name            string    `gorm:"type:varchar(255);not null" json:"name"`
-	Description     string    `gorm:"type:text" json:"description"`
-	FeedConfigs     string    `gorm:"type:json" json:"feed_configs"`
-	ReportFrequency string    `gorm:"type:enum('daily', 'weekly', 'monthly');default:'weekly'" json:"report_frequency"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID                 string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	AssetID            string    `gorm:"type:varchar(36);not null;index" json:"asset_id"`
+	Name               string    `gorm:"type:varchar(255);not null" json:"name"`
+	Description        string    `gorm:"type:text" json:"description"`
+	FeedConfigs        string    `gorm:"type:json" json:"feed_configs"` // List of feed URLs
+	ReportFrequency    string    `gorm:"type:enum('daily', 'weekly', 'monthly');default:'weekly'" json:"report_frequency"`
+	NotificationEmails string    `gorm:"type:json" json:"notification_emails"` // JSON array of emails
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+type Report struct {
+	ID          string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	RSSGroupID  string    `gorm:"type:varchar(36);not null;index" json:"rss_group_id"`
+	Type        string    `gorm:"type:enum('daily', 'weekly', 'monthly');not null" json:"type"`
+	Content     string    `gorm:"type:text" json:"content"` // Markdown/HTML
+	Status      string    `gorm:"type:enum('generating', 'completed', 'failed');default:'generating'" json:"status"`
+	GeneratedAt time.Time `json:"generated_at"`
 }
 
 type RSSFeed struct {

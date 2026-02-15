@@ -1,13 +1,18 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 	"pegasus/internal/config"
 	"pegasus/internal/handlers"
 	"pegasus/internal/models"
+	"pegasus/internal/repository"
 	"pegasus/internal/services"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -21,22 +26,38 @@ func main() {
 		log.Printf("Failed to connect to database (might be starting up): %v", err)
 	} else {
 		// Auto Migrate
-		db.AutoMigrate(&models.User{}, &models.Asset{}, &models.RSSGroup{}, &models.RSSFeed{}, &models.AISummary{}, &models.SocialRelation{})
+		db.AutoMigrate(
+			&models.User{},
+			&models.Asset{},
+			&models.RSSGroup{},
+			&models.RSSFeed{},
+			&models.AISummary{},
+			&models.SocialRelation{},
+			&models.Report{},
+		)
 	}
 
+	// Initialize Repositories
+	userRepo := repository.NewUserRepository(db)
+
 	// Initialize Services
+	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
 	aiService := services.NewAIService(cfg)
 	esService := services.NewESService(cfg)
 	rssService := services.NewRSSService(db)
+	notificationService := services.NewNotificationService(cfg)
+	reportService := services.NewReportService(db, rssService, aiService, notificationService)
 
 	// Initialize Handlers
+	authHandler := handlers.NewAuthHandler(authService)
 	aiHandler := handlers.NewAIHandler(aiService, esService)
 	rssHandler := handlers.NewRSSHandler(rssService)
+	reportHandler := handlers.NewReportHandler(reportService)
 
 	// Setup Router
 	r := gin.Default()
 
-	// CORS Middleware (Simple)
+	// CORS Middleware
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -50,12 +71,71 @@ func main() {
 
 	api := r.Group("/api")
 	{
-		api.POST("/ai/summarize", aiHandler.Summarize)
-		api.POST("/rss/fetch", rssHandler.Fetch)
+		// Public Routes
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})
 		})
+
+		auth := api.Group("/auth")
+		{
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
+		}
+
+		// Protected Routes
+		protected := api.Group("/")
+		protected.Use(AuthMiddleware(cfg.JWTSecret))
+		{
+			protected.GET("/auth/me", authHandler.Me)
+
+			protected.POST("/ai/summarize", aiHandler.Summarize)
+
+			protected.POST("/rss/fetch", rssHandler.Fetch)
+			protected.POST("/rss/group", rssHandler.CreateGroup)
+
+			protected.POST("/report/generate", reportHandler.Generate)
+		}
 	}
 
 	r.Run(":" + cfg.Port)
+}
+
+func AuthMiddleware(secret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			c.Abort()
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format"})
+			c.Abort()
+			return
+		}
+
+		tokenString := parts[1]
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte(secret), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.Abort()
+			return
+		}
+
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			if userID, ok := claims["user_id"].(string); ok {
+				c.Set("user_id", userID)
+			}
+		}
+
+		c.Next()
+	}
 }

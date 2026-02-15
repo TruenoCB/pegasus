@@ -19,6 +19,12 @@ type Config struct {
 	AIBaseURL  string
 	AIKey      string
 	AIModel    string
+
+	// SMTP Configuration
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUsername string
+	SMTPPassword string
 }
 
 func LoadConfig() *Config {
@@ -36,6 +42,11 @@ func LoadConfig() *Config {
 		AIBaseURL:  getEnv("AI_BASE_URL", "https://api.openai.com/v1"),
 		AIKey:      getEnv("OPENAI_API_KEY", ""),
 		AIModel:    getEnv("AI_MODEL", "gpt-3.5-turbo"),
+
+		SMTPHost:     getEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:     getEnv("SMTP_PORT", "587"),
+		SMTPUsername: getEnv("SMTP_USERNAME", ""),
+		SMTPPassword: getEnv("SMTP_PASSWORD", ""),
 	}
 }
 

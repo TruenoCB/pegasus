@@ -39,7 +39,7 @@ type ChatResponse struct {
 
 func (s *AIService) Summarize(content string, lang string) (string, error) {
 	prompt := fmt.Sprintf("Please summarize the following content into a concise report. Provide 3 key points. Translate to %s if needed. Return ONLY the summary text.", lang)
-	
+
 	reqBody := ChatRequest{
 		Model: s.cfg.AIModel,
 		Messages: []Message{
@@ -55,7 +55,7 @@ func (s *AIService) Summarize(content string, lang string) (string, error) {
 
 	// Handle trailing slash in BaseURL
 	url := fmt.Sprintf("%s/chat/completions", s.cfg.AIBaseURL)
-	
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
@@ -72,7 +72,7 @@ func (s *AIService) Summarize(content string, lang string) (string, error) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	
+
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("AI API Error: %s", string(body))
 	}

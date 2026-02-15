@@ -4,9 +4,11 @@ import (
 	"errors"
 	"time"
 
+	"pegasus/internal/models"
+	"pegasus/internal/repository"
+
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/pegasus/backend/internal/models"
-	"github.com/pegasus/backend/internal/repository"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -37,7 +39,7 @@ func (s *AuthService) Register(email, password, name string) (*models.User, stri
 	}
 
 	user := &models.User{
-		ID:           generateUUID(),
+		ID:           uuid.New().String(),
 		Email:        email,
 		PasswordHash: string(hashedPassword),
 		Name:         name,
@@ -78,6 +80,10 @@ func (s *AuthService) Login(email, password string) (*models.User, string, error
 	return user, token, nil
 }
 
+func (s *AuthService) GetProfile(userID string) (*models.User, error) {
+	return s.userRepo.FindByID(userID)
+}
+
 func (s *AuthService) generateToken(userID string) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
@@ -85,11 +91,4 @@ func (s *AuthService) generateToken(userID string) (string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.jwtSecret))
-}
-
-// Helper
-func generateUUID() string {
-	// In real app use github.com/google/uuid
-	// Minimal implementation for now to avoid extra dependency if not needed
-	return time.Now().Format("20060102150405") // Placeholder, should be UUID
 }

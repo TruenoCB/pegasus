@@ -3,7 +3,8 @@ package repository
 import (
 	"errors"
 
-	"github.com/pegasus/backend/internal/models"
+	"pegasus/internal/models"
+
 	"gorm.io/gorm"
 )
 
