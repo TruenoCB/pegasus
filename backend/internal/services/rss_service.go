@@ -4,11 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"pegasus/internal/models"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mmcdole/gofeed"
 	"gorm.io/gorm"
+
+	"pegasus/internal/models"
 )
 
 type RSSService struct {
@@ -29,6 +31,7 @@ func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, email
 
 	// Create Asset first
 	asset := models.Asset{
+		ID:          uuid.New().String(),
 		UserID:      userID,
 		Type:        "RSS_GROUP",
 		Title:       name,
@@ -40,6 +43,7 @@ func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, email
 	}
 
 	group := models.RSSGroup{
+		ID:                 uuid.New().String(),
 		AssetID:            asset.ID,
 		Name:               name,
 		Description:        desc,
@@ -74,6 +78,7 @@ func (s *RSSService) GetUserGroups(userID string) ([]models.RSSGroup, error) {
 func (s *RSSService) SaveSummaryReport(userID, groupID, title, content string) (*models.SummaryReport, error) {
 	// Create Asset first
 	asset := models.Asset{
+		ID:          uuid.New().String(),
 		UserID:      userID,
 		Type:        "SUMMARY_REPORT",
 		Title:       title,
@@ -85,6 +90,7 @@ func (s *RSSService) SaveSummaryReport(userID, groupID, title, content string) (
 	}
 
 	report := models.SummaryReport{
+		ID:      uuid.New().String(),
 		AssetID: asset.ID,
 		GroupID: &groupID,
 		Title:   title,
@@ -137,7 +143,10 @@ func (s *RSSService) FetchAndSave(url string) error {
 		return err
 	}
 
-	rssFeed := models.RSSFeed{URL: url}
+	rssFeed := models.RSSFeed{
+		ID:  uuid.New().String(),
+		URL: url,
+	}
 	// Find or create feed
 	if err := s.db.Where("url = ?", url).FirstOrCreate(&rssFeed).Error; err != nil {
 		return err
@@ -160,6 +169,7 @@ func (s *RSSService) FetchAndSave(url string) error {
 		}
 
 		summary := models.AISummary{
+			ID:              uuid.New().String(),
 			FeedID:          rssFeed.ID,
 			ContentHash:     hash,
 			OriginalTitle:   item.Title,
@@ -205,12 +215,38 @@ func (s *RSSService) GetUnsummarizedItems(groupID string, since time.Time) ([]mo
 
 func (s *RSSService) GetPopularSources() ([]models.PopularSource, error) {
 	var sources []models.PopularSource
-	err := s.db.Order("subscribers desc").Find(&sources).Error
+	err := s.db.Find(&sources).Error
 
-	// For MVP: Generate subscriber counts if missing, to make it look active
-	for i := range sources {
-		if sources[i].Subscribers == 0 {
-			sources[i].Subscribers = int(time.Now().UnixNano()%10000) + 1000
+	if err == nil {
+		// Calculate real subscriber counts from RSSGroups
+		var allGroups []models.RSSGroup
+		if s.db.Find(&allGroups).Error == nil {
+			// Map to count how many times each URL is used
+			urlCounts := make(map[string]int)
+			for _, group := range allGroups {
+				var urls []string
+				if json.Unmarshal([]byte(group.FeedConfigs), &urls) == nil {
+					for _, url := range urls {
+						urlCounts[url]++
+					}
+				}
+			}
+
+			// Update the sources with real counts + a base number so it doesn't look empty
+			for i := range sources {
+				realCount := urlCounts[sources[i].URL]
+				// Base popularity + real usage
+				sources[i].Subscribers = 1000 + (realCount * 42) // Multiplier for visual effect, base 1000
+			}
+		}
+	}
+
+	// Sort by subscribers descending
+	for i := 0; i < len(sources); i++ {
+		for j := i + 1; j < len(sources); j++ {
+			if sources[i].Subscribers < sources[j].Subscribers {
+				sources[i], sources[j] = sources[j], sources[i]
+			}
 		}
 	}
 
@@ -222,10 +258,10 @@ func (s *RSSService) SeedPopularSources() {
 	s.db.Model(&models.PopularSource{}).Count(&count)
 	if count == 0 {
 		sources := []models.PopularSource{
-			{Name: "TechCrunch", URL: "https://techcrunch.com/feed/", Category: "Technology", IconType: "Cpu", Subscribers: 1205},
-			{Name: "36Kr", URL: "https://36kr.com/feed", Category: "Business", IconType: "TrendingUp", Subscribers: 890},
-			{Name: "The Verge", URL: "https://www.theverge.com/rss/index.xml", Category: "Tech/Culture", IconType: "Globe", Subscribers: 2300},
-			{Name: "BBC News", URL: "http://feeds.bbci.co.uk/news/rss.xml", Category: "World", IconType: "Newspaper", Subscribers: 5000},
+			{ID: uuid.New().String(), Name: "TechCrunch", URL: "https://techcrunch.com/feed/", Category: "Technology", IconType: "Cpu", Subscribers: 1205},
+			{ID: uuid.New().String(), Name: "36Kr", URL: "https://36kr.com/feed", Category: "Business", IconType: "TrendingUp", Subscribers: 890},
+			{ID: uuid.New().String(), Name: "The Verge", URL: "https://www.theverge.com/rss/index.xml", Category: "Tech/Culture", IconType: "Globe", Subscribers: 2300},
+			{ID: uuid.New().String(), Name: "BBC News", URL: "http://feeds.bbci.co.uk/news/rss.xml", Category: "World", IconType: "Newspaper", Subscribers: 5000},
 		}
 		s.db.Create(&sources)
 	}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -86,6 +87,7 @@ func (s *ReportService) GenerateReport(groupID string, reportType string) (*mode
 
 	// 6. Save Report
 	report := models.Report{
+		ID:          uuid.New().String(),
 		RSSGroupID:  groupID,
 		Type:        reportType,
 		Content:     summary,

@@ -2,6 +2,8 @@ package services
 
 import (
 	"pegasus/internal/models"
+
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -16,6 +18,7 @@ func NewSocialService(db *gorm.DB) *SocialService {
 func (s *SocialService) CreatePost(userID, content string) (*models.Post, error) {
 	// First, explicitly create an Asset for this post
 	asset := models.Asset{
+		ID:          uuid.New().String(),
 		UserID:      userID,
 		Type:        "POST",
 		Title:       "User Post",
@@ -28,6 +31,7 @@ func (s *SocialService) CreatePost(userID, content string) (*models.Post, error)
 	}
 
 	post := &models.Post{
+		ID:      uuid.New().String(),
 		UserID:  userID,
 		Content: content,
 		AssetID: &asset.ID,
@@ -52,12 +56,17 @@ func (s *SocialService) LikePost(userID, postID string) error {
 		return s.db.Delete(&existing).Error
 	}
 	
-	like := models.Like{UserID: userID, PostID: postID}
+	like := models.Like{
+		ID:     uuid.New().String(),
+		UserID: userID,
+		PostID: postID,
+	}
 	return s.db.Create(&like).Error
 }
 
 func (s *SocialService) CommentPost(userID, postID, content string) (*models.Comment, error) {
 	comment := &models.Comment{
+		ID:      uuid.New().String(),
 		UserID:  userID,
 		PostID:  postID,
 		Content: content,
@@ -77,6 +86,7 @@ func (s *SocialService) ToggleFollow(followerID, followingID string) error {
 	}
 
 	relation := models.SocialRelation{
+		ID:          uuid.New().String(),
 		FollowerID:  followerID,
 		FollowingID: followingID,
 		Type:        "follow",
@@ -114,6 +124,7 @@ func (s *SocialService) GetProfileStats(userID string) (map[string]int64, error)
 
 func (s *SocialService) SendMessage(senderID, receiverID, content string) (*models.Message, error) {
 	msg := &models.Message{
+		ID:         uuid.New().String(),
 		SenderID:   senderID,
 		ReceiverID: receiverID,
 		Content:    content,
