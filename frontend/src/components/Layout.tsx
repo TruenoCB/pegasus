@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { Home, Compass, MessageCircle, User, Zap } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import DynamicBackground from './DynamicBackground';
 
 export const Layout: React.FC = () => {
   const { user } = useAuthStore();
@@ -15,7 +16,8 @@ export const Layout: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white flex">
+    <div className="min-h-screen bg-transparent text-white flex relative">
+      <DynamicBackground />
       {/* Sidebar Navigation */}
       {user && (
         <nav className="fixed bottom-0 left-0 right-0 md:top-0 md:bottom-auto md:left-0 md:h-screen md:w-64 bg-black/90 backdrop-blur-xl border-t md:border-t-0 md:border-r border-white/10 z-50">
