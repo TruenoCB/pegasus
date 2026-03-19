@@ -1,37 +1,56 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, MessageCircle, Share2, MoreHorizontal, User, Shield, Zap, Search } from 'lucide-react';
-
-const MOCK_POSTS = [
-  {
-    id: 1,
-    user: { name: 'Alex Rivera', avatar: 'AR', role: 'AI Researcher' },
-    content: 'Just used AURORA to summarize the latest papers on LLM quantization. The noise-to-signal ratio in research is getting crazy, but AI-powered filtering is a lifesaver. ⚡️',
-    timestamp: '2h ago',
-    likes: 42,
-    comments: 12,
-    tag: 'AURORA'
-  },
-  {
-    id: 2,
-    user: { name: 'Sarah Chen', avatar: 'SC', role: 'Digital Architect' },
-    content: 'The "Everything is an Asset" philosophy in PEGASUS is revolutionary. I just tokenized my latest open-source contribution as a personal asset. The future of digital ownership is here. 🌐',
-    timestamp: '5h ago',
-    likes: 128,
-    comments: 24,
-    tag: 'Assets'
-  },
-  {
-    id: 3,
-    user: { name: 'Marc Thorne', avatar: 'MT', role: 'Privacy Advocate' },
-    content: 'Decentralized social graphs are no longer a dream. PEGASUS is actually making it usable for the average person. No more echo chambers, no more data silos. 🛡️',
-    timestamp: '1d ago',
-    likes: 89,
-    comments: 8,
-    tag: 'Social'
-  }
-];
+import { useAuthStore } from '../store/authStore';
 
 const Social: React.FC = () => {
+  const { token, user } = useAuthStore();
+  const [posts, setPosts] = useState<any[]>([]);
+  const [newPostContent, setNewPostContent] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const fetchPosts = async () => {
+    try {
+      const res = await fetch('/api/social/posts', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPosts(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch posts", error);
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchPosts();
+  }, [token]);
+
+  const handlePost = async () => {
+    if (!newPostContent.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/social/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ content: newPostContent })
+      });
+      if (res.ok) {
+        setNewPostContent('');
+        fetchPosts(); // Refresh feed
+      } else {
+        alert("Failed to create post");
+      }
+    } catch (error) {
+      console.error("Failed to post", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
       {/* Left Sidebar - Profile & Trends */}
@@ -42,7 +61,7 @@ const Social: React.FC = () => {
               U
             </div>
             <h3 className="font-bold text-lg">Your Profile</h3>
-            <p className="text-sm text-gray-500 mb-4">@user_name</p>
+            <p className="text-sm text-gray-500 mb-4">@{user?.name || 'user_name'}</p>
             <div className="grid grid-cols-2 w-full gap-2 border-t border-white/5 pt-4">
               <div className="text-center">
                 <div className="font-bold">128</div>
@@ -78,63 +97,67 @@ const Social: React.FC = () => {
           </div>
           <input 
             type="text" 
+            value={newPostContent}
+            onChange={(e) => setNewPostContent(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handlePost()}
             placeholder="Share an insight or asset..." 
             className="flex-1 bg-transparent border-none focus:outline-none text-gray-300"
           />
-          <button className="px-4 py-2 bg-white text-black text-sm font-bold rounded-full hover:bg-gray-200 transition-colors">
-            Post
+          <button 
+            onClick={handlePost}
+            disabled={loading || !newPostContent.trim()}
+            className="px-4 py-2 bg-white text-black text-sm font-bold rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Posting...' : 'Post'}
           </button>
         </div>
 
         {/* Feed Posts */}
         <div className="space-y-6">
-          {MOCK_POSTS.map((post) => (
-            <article key={post.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 hover:bg-white/[0.07] transition-all group">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex gap-3">
-                  <div className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center font-bold text-blue-400 border border-white/5">
-                    {post.user.avatar}
+          {posts.length === 0 ? (
+            <div className="text-center py-10 text-gray-500 border border-dashed border-white/10 rounded-3xl">
+              No posts yet. Be the first to share!
+            </div>
+          ) : (
+            posts.map((post) => (
+              <article key={post.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 hover:bg-white/[0.07] transition-all group">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex gap-3">
+                    <div className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center font-bold text-blue-400 border border-white/5 uppercase">
+                      {post.user?.name?.substring(0, 2) || 'AN'}
+                    </div>
+                    <div>
+                      <h4 className="font-bold flex items-center gap-2">
+                        {post.user?.name || 'Anonymous'}
+                      </h4>
+                      <p className="text-xs text-gray-500">{new Date(post.created_at).toLocaleString()}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold flex items-center gap-2">
-                      {post.user.name}
-                      {post.id === 1 && <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
-                    </h4>
-                    <p className="text-xs text-gray-500">{post.user.role} • {post.timestamp}</p>
-                  </div>
+                  <button className="text-gray-500 hover:text-white">
+                    <MoreHorizontal className="w-5 h-5" />
+                  </button>
                 </div>
-                <button className="text-gray-500 hover:text-white">
-                  <MoreHorizontal className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="mb-4 text-gray-300 leading-relaxed">
-                {post.content}
-              </div>
-
-              {post.tag && (
-                <div className="mb-6">
-                  <span className="px-3 py-1 bg-blue-500/10 text-blue-400 text-[10px] font-black uppercase tracking-widest rounded-full border border-blue-500/20">
-                    {post.tag}
-                  </span>
+                <div className="mb-4 text-gray-300 leading-relaxed whitespace-pre-wrap">
+                  {post.content}
                 </div>
-              )}
 
-              <div className="flex items-center gap-6 border-t border-white/5 pt-4">
-                <button className="flex items-center gap-2 text-gray-500 hover:text-red-400 transition-colors group/btn">
-                  <Heart className="w-4 h-4 group-hover/btn:fill-red-400" />
-                  <span className="text-xs font-medium">{post.likes}</span>
-                </button>
-                <button className="flex items-center gap-2 text-gray-500 hover:text-blue-400 transition-colors">
-                  <MessageCircle className="w-4 h-4" />
-                  <span className="text-xs font-medium">{post.comments}</span>
-                </button>
-                <button className="flex items-center gap-2 text-gray-500 hover:text-green-400 transition-colors ml-auto">
-                  <Share2 className="w-4 h-4" />
-                </button>
-              </div>
-            </article>
-          ))}
+                <div className="flex items-center gap-6 border-t border-white/5 pt-4">
+                  <button className="flex items-center gap-2 text-gray-500 hover:text-red-400 transition-colors group/btn">
+                    <Heart className="w-4 h-4 group-hover/btn:fill-red-400" />
+                    <span className="text-xs font-medium">0</span>
+                  </button>
+                  <button className="flex items-center gap-2 text-gray-500 hover:text-blue-400 transition-colors">
+                    <MessageCircle className="w-4 h-4" />
+                    <span className="text-xs font-medium">0</span>
+                  </button>
+                  <button className="flex items-center gap-2 text-gray-500 hover:text-green-400 transition-colors ml-auto">
+                    <Share2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </main>
 
@@ -143,12 +166,13 @@ const Social: React.FC = () => {
         <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
           <h4 className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-500">Who to follow</h4>
           <div className="space-y-4">
+            {/* You could fetch users from /api/chat/users here later */}
             {[
               { name: 'Dr. Orion', role: 'AI Strategist' },
               { name: 'Luna Stark', role: 'NFT Artist' }
             ].map((person) => (
               <div key={person.name} className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gray-800 rounded-lg" />
+                <div className="w-8 h-8 bg-gray-800 rounded-lg flex items-center justify-center text-xs font-bold uppercase">{person.name.substring(0, 2)}</div>
                 <div className="flex-1">
                   <div className="text-xs font-bold">{person.name}</div>
                   <div className="text-[10px] text-gray-500">{person.role}</div>

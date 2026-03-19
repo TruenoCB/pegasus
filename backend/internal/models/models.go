@@ -81,3 +81,32 @@ type SocialRelation struct {
 	Type        string    `gorm:"type:enum('follow', 'friend', 'block');default:'follow'" json:"type"`
 	CreatedAt   time.Time `json:"created_at"`
 }
+
+type Post struct {
+	ID        string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	UserID    string    `gorm:"type:varchar(36);not null;index" json:"user_id"`
+	User      User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Content   string    `gorm:"type:text;not null" json:"content"`
+	AssetID   *string   `gorm:"type:varchar(36);index" json:"asset_id,omitempty"` // Optional attached asset
+	Asset     *Asset    `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type Message struct {
+	ID         string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	SenderID   string    `gorm:"type:varchar(36);not null;index" json:"sender_id"`
+	ReceiverID string    `gorm:"type:varchar(36);not null;index" json:"receiver_id"`
+	Content    string    `gorm:"type:text;not null" json:"content"`
+	IsRead     bool      `gorm:"default:false" json:"is_read"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type PopularSource struct {
+	ID          string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	Name        string    `gorm:"type:varchar(255);not null" json:"name"`
+	URL         string    `gorm:"uniqueIndex;type:varchar(500);not null" json:"url"`
+	Category    string    `gorm:"type:varchar(100)" json:"category"`
+	IconType    string    `gorm:"type:varchar(50)" json:"icon_type"` // e.g. "Cpu", "TrendingUp"
+	Subscribers int       `gorm:"default:0" json:"subscribers"`
+}

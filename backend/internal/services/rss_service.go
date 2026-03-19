@@ -52,6 +52,29 @@ func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, email
 	return &group, nil
 }
 
+func (s *RSSService) FetchAndParse(url string) (*models.RSSFeed, []models.AISummary, error) {
+	feed, err := s.fp.ParseURL(url)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rssFeed := &models.RSSFeed{
+		URL:         url,
+		Title:       feed.Title,
+		Description: feed.Description,
+		LastFetch:   time.Now(),
+	}
+
+	var items []models.AISummary
+	for _, item := range feed.Items {
+		items = append(items, models.AISummary{
+			OriginalTitle:   item.Title,
+			OriginalContent: item.Description + "\n" + item.Content,
+		})
+	}
+
+	return rssFeed, items, nil
+}
 func (s *RSSService) FetchAndSave(url string) error {
 	feed, err := s.fp.ParseURL(url)
 	if err != nil {
@@ -122,6 +145,26 @@ func (s *RSSService) GetUnsummarizedItems(groupID string, since time.Time) ([]mo
 	json.Unmarshal([]byte(group.NotificationEmails), &emails)
 
 	return items, emails, nil
+}
+
+func (s *RSSService) GetPopularSources() ([]models.PopularSource, error) {
+	var sources []models.PopularSource
+	err := s.db.Order("subscribers desc").Find(&sources).Error
+	return sources, err
+}
+
+func (s *RSSService) SeedPopularSources() {
+	var count int64
+	s.db.Model(&models.PopularSource{}).Count(&count)
+	if count == 0 {
+		sources := []models.PopularSource{
+			{Name: "TechCrunch", URL: "https://techcrunch.com/feed/", Category: "Technology", IconType: "Cpu", Subscribers: 1205},
+			{Name: "36Kr", URL: "https://36kr.com/feed", Category: "Business", IconType: "TrendingUp", Subscribers: 890},
+			{Name: "The Verge", URL: "https://www.theverge.com/rss/index.xml", Category: "Tech/Culture", IconType: "Globe", Subscribers: 2300},
+			{Name: "BBC News", URL: "http://feeds.bbci.co.uk/news/rss.xml", Category: "World", IconType: "Newspaper", Subscribers: 5000},
+		}
+		s.db.Create(&sources)
+	}
 }
 
 func generateHash(s string) string {

@@ -34,7 +34,14 @@ func main() {
 			&models.AISummary{},
 			&models.SocialRelation{},
 			&models.Report{},
+			&models.Post{},
+			&models.Message{},
+			&models.PopularSource{},
 		)
+
+		// Seed dummy popular sources for demo
+		rssService := services.NewRSSService(db)
+		rssService.SeedPopularSources()
 	}
 
 	// Initialize Repositories
@@ -47,6 +54,7 @@ func main() {
 	rssService := services.NewRSSService(db)
 	notificationService := services.NewNotificationService(cfg)
 	reportService := services.NewReportService(db, rssService, aiService, notificationService)
+	socialService := services.NewSocialService(db)
 
 	// Initialize and Start Scheduler
 	schedulerService := services.NewSchedulerService(db, reportService)
@@ -58,6 +66,7 @@ func main() {
 	aiHandler := handlers.NewAIHandler(aiService, esService)
 	rssHandler := handlers.NewRSSHandler(rssService)
 	reportHandler := handlers.NewReportHandler(reportService)
+	socialHandler := handlers.NewSocialHandler(socialService)
 
 	// Setup Router
 	r := gin.Default()
@@ -96,9 +105,20 @@ func main() {
 			protected.POST("/ai/summarize", aiHandler.Summarize)
 
 			protected.POST("/rss/fetch", rssHandler.Fetch)
+			protected.POST("/rss/process", rssHandler.Process)
 			protected.POST("/rss/group", rssHandler.CreateGroup)
+			protected.GET("/rss/popular", rssHandler.GetPopularSources)
 
 			protected.POST("/report/generate", reportHandler.Generate)
+
+			// Social
+			protected.POST("/social/posts", socialHandler.CreatePost)
+			protected.GET("/social/posts", socialHandler.GetPosts)
+
+			// Chat
+			protected.GET("/chat/users", socialHandler.GetUsers)
+			protected.POST("/chat/messages", socialHandler.SendMessage)
+			protected.GET("/chat/messages", socialHandler.GetMessages)
 		}
 	}
 

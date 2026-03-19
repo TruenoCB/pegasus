@@ -12,6 +12,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     { name: 'PEGASUS', path: '/' },
     { name: 'AURORA', path: '/aurora' },
     { name: 'Social', path: '/social' },
+    { name: 'Chat', path: '/chat' },
   ];
 
   return (

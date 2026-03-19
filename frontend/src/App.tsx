@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Aurora from './pages/Aurora';
 import Social from './pages/Social';
+import Chat from './pages/Chat';
 import Profile from './pages/Profile';
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/aurora" element={<Aurora />} />
         <Route path="/social" element={<Social />} />
+        <Route path="/chat" element={<Chat />} />
         <Route path="/profile" element={<Profile />} />
       </Routes>
     </Layout>

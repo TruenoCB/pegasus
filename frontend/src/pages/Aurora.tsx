@@ -1,17 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { 
   Plus, Rss, Loader2, Compass, TrendingUp, 
-  Newspaper, Cpu, Globe, Mail, Share2, Bookmark 
+  Newspaper, Cpu, Globe, Share2, Bookmark, FolderPlus, Send
 } from 'lucide-react';
 
 // 推荐的 RSS 源列表 (模拟社区推荐)
-const RECOMMENDED_FEEDS = [
-  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', category: 'Technology', icon: <Cpu className="w-4 h-4" /> },
-  { name: '36Kr', url: 'https://36kr.com/feed', category: 'Business', icon: <TrendingUp className="w-4 h-4" /> },
-  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', category: 'Tech/Culture', icon: <Globe className="w-4 h-4" /> },
-  { name: 'BBC News', url: 'http://feeds.bbci.co.uk/news/rss.xml', category: 'World', icon: <Newspaper className="w-4 h-4" /> },
-];
+// This will now be fetched from backend
+// const RECOMMENDED_FEEDS = [...]
 
 const Aurora: React.FC = () => {
     const { token } = useAuthStore();
@@ -19,6 +15,46 @@ const Aurora: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [summaries, setSummaries] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState('discover');
+    
+    // Popular sources state
+    const [popularSources, setPopularSources] = useState<any[]>([]);
+
+    // Group creation state
+    const [showGroupModal, setShowGroupModal] = useState(false);
+    const [groupName, setGroupName] = useState('');
+    const [groupEmails, setGroupEmails] = useState('');
+    const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
+    const [creatingGroup, setCreatingGroup] = useState(false);
+
+    useEffect(() => {
+        const fetchPopularSources = async () => {
+            try {
+                const res = await fetch('/api/rss/popular', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setPopularSources(data || []);
+                }
+            } catch (error) {
+                console.error("Failed to fetch popular sources", error);
+            }
+        };
+        
+        if (token) {
+            fetchPopularSources();
+        }
+    }, [token]);
+
+    const getIconComponent = (iconType: string) => {
+        switch (iconType) {
+            case 'Cpu': return <Cpu className="w-4 h-4" />;
+            case 'TrendingUp': return <TrendingUp className="w-4 h-4" />;
+            case 'Globe': return <Globe className="w-4 h-4" />;
+            case 'Newspaper': return <Newspaper className="w-4 h-4" />;
+            default: return <Rss className="w-4 h-4" />;
+        }
+    };
 
     const handleProcess = async (feedUrl?: string) => {
         const targetUrl = feedUrl || url;
@@ -28,22 +64,67 @@ const Aurora: React.FC = () => {
         try {
             const res = await fetch('/api/rss/process', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
                 body: JSON.stringify({ url: targetUrl }),
             });
             const data = await res.json();
-            if (data.summaries) {
+            if (res.ok && data.summaries) {
                 setSummaries(data.summaries);
                 setActiveTab('results'); // 自动切换到结果页
             } else {
-                alert('No summaries returned. Check console/logs.');
+                alert(data.error || 'Failed to process feed. Please check URL or login status.');
             }
         } catch (error) {
             console.error(error);
-            alert('Error processing feed');
+            alert('Error processing feed. Ensure you are logged in.');
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleCreateGroup = async () => {
+        if (!groupName || selectedUrls.length === 0) return;
+        
+        setCreatingGroup(true);
+        try {
+            const res = await fetch('/api/rss/group', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ 
+                    name: groupName,
+                    description: `Group created with ${selectedUrls.length} feeds`,
+                    urls: selectedUrls,
+                    emails: groupEmails.split(',').map(e => e.trim()).filter(e => e)
+                }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert('Group created successfully!');
+                setShowGroupModal(false);
+                setGroupName('');
+                setGroupEmails('');
+                setSelectedUrls([]);
+            } else {
+                alert(data.error || 'Failed to create group');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error creating group');
+        } finally {
+            setCreatingGroup(false);
+        }
+    };
+
+    const toggleUrlSelection = (feedUrl: string) => {
+        setSelectedUrls(prev => 
+            prev.includes(feedUrl) ? prev.filter(u => u !== feedUrl) : [...prev, feedUrl]
+        );
     };
 
     return (
@@ -110,30 +191,110 @@ const Aurora: React.FC = () => {
                             <h2 className="text-2xl font-bold flex items-center gap-2">
                                 Popular Sources
                             </h2>
+                            <button 
+                                onClick={() => setShowGroupModal(true)}
+                                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors"
+                            >
+                                <FolderPlus className="w-4 h-4" /> Create Group
+                            </button>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {RECOMMENDED_FEEDS.map((feed) => (
+                            {popularSources.map((feed) => (
                                 <div 
                                     key={feed.name}
-                                    className="group p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer relative overflow-hidden"
-                                    onClick={() => handleProcess(feed.url)}
+                                    className={`group p-6 border rounded-3xl transition-all relative overflow-hidden ${
+                                        selectedUrls.includes(feed.url) 
+                                        ? 'bg-blue-900/20 border-blue-500/50' 
+                                        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                                    }`}
                                 >
-                                    <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-100 transition-opacity">
-                                        <Plus className="w-6 h-6" />
+                                    <div className="absolute top-0 right-0 p-4 opacity-50 hover:opacity-100 transition-opacity z-10 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-5 h-5 accent-blue-500"
+                                            checked={selectedUrls.includes(feed.url)}
+                                            onChange={() => toggleUrlSelection(feed.url)}
+                                        />
                                     </div>
-                                    <div className="mb-4 text-gray-400">
-                                        {feed.icon}
+                                    <div className="mb-4 text-gray-400 cursor-pointer" onClick={() => handleProcess(feed.url)}>
+                                        {getIconComponent(feed.icon_type)}
                                     </div>
-                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">
+                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1 cursor-pointer" onClick={() => handleProcess(feed.url)}>
                                         {feed.category}
                                     </div>
-                                    <h3 className="text-xl font-bold mb-4">{feed.name}</h3>
-                                    <button className="text-sm font-semibold py-2 px-4 bg-white/10 rounded-full group-hover:bg-white group-hover:text-black transition-all">
+                                    <h3 className="text-xl font-bold mb-2 cursor-pointer" onClick={() => handleProcess(feed.url)}>{feed.name}</h3>
+                                    <div className="text-xs text-gray-500 mb-4">{feed.subscribers} subscribers</div>
+                                    <button 
+                                        onClick={() => handleProcess(feed.url)}
+                                        className="text-sm font-semibold py-2 px-4 bg-white/10 rounded-full hover:bg-white hover:text-black transition-all"
+                                    >
                                         Quick Analyze
                                     </button>
                                 </div>
                             ))}
                         </div>
+
+                        {/* Group Creation Modal */}
+                        {showGroupModal && (
+                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                                <div className="bg-zinc-900 border border-white/10 rounded-3xl p-8 w-full max-w-md">
+                                    <h3 className="text-2xl font-bold mb-6">Create RSS Group</h3>
+                                    
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Group Name</label>
+                                            <input 
+                                                type="text" 
+                                                value={groupName}
+                                                onChange={e => setGroupName(e.target.value)}
+                                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30"
+                                                placeholder="e.g. Daily Tech News"
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Notification Emails (comma separated)</label>
+                                            <input 
+                                                type="text" 
+                                                value={groupEmails}
+                                                onChange={e => setGroupEmails(e.target.value)}
+                                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30"
+                                                placeholder="user@example.com, team@example.com"
+                                            />
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <p className="text-sm text-gray-400 mb-2">Selected Feeds ({selectedUrls.length}):</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {selectedUrls.length === 0 ? (
+                                                    <span className="text-xs text-red-400">Please select at least one feed from the Discover tab first.</span>
+                                                ) : (
+                                                    popularSources.filter(f => selectedUrls.includes(f.url)).map(f => (
+                                                        <span key={f.name} className="text-xs px-2 py-1 bg-white/10 rounded-md">{f.name}</span>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 mt-8">
+                                        <button 
+                                            onClick={() => setShowGroupModal(false)}
+                                            className="flex-1 py-3 px-4 rounded-xl font-bold bg-white/5 hover:bg-white/10 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            onClick={handleCreateGroup}
+                                            disabled={creatingGroup || !groupName || selectedUrls.length === 0}
+                                            className="flex-1 py-3 px-4 rounded-xl font-bold bg-white text-black hover:bg-gray-200 transition-colors disabled:opacity-50"
+                                        >
+                                            {creatingGroup ? 'Creating...' : 'Create Group'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </section>
                 ) : (
                     <section className="animate-in slide-in-from-bottom-4 duration-500">
