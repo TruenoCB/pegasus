@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { Send, User } from 'lucide-react';
+import { Send, User, MessageCircle } from 'lucide-react';
 
 const Chat: React.FC = () => {
   const { token, user } = useAuthStore();
