@@ -55,7 +55,7 @@ func (s *SocialService) LikePost(userID, postID string) error {
 		// Already liked, unlike it
 		return s.db.Delete(&existing).Error
 	}
-	
+
 	like := models.Like{
 		ID:     uuid.New().String(),
 		UserID: userID,
@@ -108,7 +108,7 @@ func (s *SocialService) GetUserAssets(userID string) ([]models.Asset, error) {
 
 func (s *SocialService) GetProfileStats(userID string) (map[string]int64, error) {
 	var postCount, followingCount, followerCount, assetCount int64
-	
+
 	s.db.Model(&models.Post{}).Where("user_id = ?", userID).Count(&postCount)
 	s.db.Model(&models.SocialRelation{}).Where("follower_id = ? AND type = 'follow'", userID).Count(&followingCount)
 	s.db.Model(&models.SocialRelation{}).Where("following_id = ? AND type = 'follow'", userID).Count(&followerCount)
@@ -144,8 +144,21 @@ func (s *SocialService) GetMessages(user1, user2 string, limit, offset int) ([]m
 	return messages, err
 }
 
-func (s *SocialService) GetUsers() ([]models.User, error) {
+func (s *SocialService) GetUsers(query string) ([]models.User, error) {
 	var users []models.User
-	err := s.db.Select("id", "name", "email", "avatar_url").Find(&users).Error
+	dbQuery := s.db.Select("id", "name", "email", "avatar_url")
+	if query != "" {
+		dbQuery = dbQuery.Where("name LIKE ? OR email LIKE ?", "%"+query+"%", "%"+query+"%")
+	}
+	err := dbQuery.Find(&users).Error
 	return users, err
+}
+
+func (s *SocialService) GetUserByID(userID string) (*models.User, error) {
+	var user models.User
+	err := s.db.Select("id", "name", "email", "avatar_url", "bio").Where("id = ?", userID).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }

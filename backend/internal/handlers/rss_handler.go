@@ -133,6 +133,29 @@ type GenerateGroupReportRequest struct {
 	GroupID string `json:"group_id" binding:"required"`
 }
 
+func (h *RSSHandler) UpdateGroup(c *gin.Context) {
+	userID := c.GetString("user_id")
+	groupID := c.Param("id")
+
+	var req struct {
+		Name         string   `json:"name" binding:"required"`
+		URLs         []string `json:"urls" binding:"required"`
+		PromptConfig string   `json:"prompt_config"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.rssService.UpdateGroup(userID, groupID, req.Name, req.URLs, req.PromptConfig)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
 func (h *RSSHandler) GenerateGroupReport(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {

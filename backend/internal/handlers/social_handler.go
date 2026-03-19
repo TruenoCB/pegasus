@@ -159,10 +159,25 @@ func (h *SocialHandler) GetMessages(c *gin.Context) {
 }
 
 func (h *SocialHandler) GetUsers(c *gin.Context) {
-	users, err := h.socialService.GetUsers()
+	query := c.Query("q")
+	users, err := h.socialService.GetUsers(query)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, users)
+}
+
+func (h *SocialHandler) GetUser(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "me" {
+		userID = c.GetString("user_id")
+	}
+
+	user, err := h.socialService.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, user)
 }

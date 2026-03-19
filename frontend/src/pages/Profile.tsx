@@ -1,21 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { User, Settings, Shield, Award, Globe, Mail, Link as LinkIcon, Edit3, Zap, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { User, Settings, Shield, Award, Globe, Mail, Link as LinkIcon, Edit3, Zap, LogOut, X, Loader2 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 const Profile: React.FC = () => {
-  const { user, token, logout } = useAuthStore();
+  const { id } = useParams<{ id: string }>();
+  const { user: currentUser, token, logout, login } = useAuthStore();
   const navigate = useNavigate();
+  const isMe = !id || id === currentUser?.id;
+  const targetUserId = isMe ? currentUser?.id : id;
+
+  const [user, setUser] = useState<any>(isMe ? currentUser : null);
   const [stats, setStats] = useState({ posts: 0, following: 0, followers: 0 });
   const [assetCount, setAssetCount] = useState(0);
   const [posts, setPosts] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [popularAssets, setPopularAssets] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!token) return;
+      if (!token || !targetUserId) return;
       try {
-        const statsRes = await fetch('/api/social/users/me/stats', {
+        // Fetch user info if not me
+        if (!isMe) {
+          const userRes = await fetch(`/api/social/users/${targetUserId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (userRes.ok) {
+            setUser(await userRes.json());
+          }
+        }
+
+        const statsRes = await fetch(`/api/social/users/${targetUserId}/stats`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (statsRes.ok) {
@@ -28,34 +48,66 @@ const Profile: React.FC = () => {
           setAssetCount(data.assets || 0);
         }
 
-        // Fetch user's posts (we can reuse the main posts endpoint but filter locally for now, 
-        // ideally backend should have a /users/me/posts endpoint)
         const postsRes = await fetch('/api/social/posts', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (postsRes.ok) {
           const allPosts = await postsRes.json();
-          setPosts(allPosts.filter((p: any) => p.user_id === user?.id));
+          setPosts(allPosts.filter((p: any) => p.user_id === targetUserId));
         }
 
-        // Fetch user's assets
-        const assetsRes = await fetch('/api/social/users/me/assets', {
+        const assetsRes = await fetch(`/api/social/users/${isMe ? 'me' : targetUserId}/assets`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (assetsRes.ok) {
-          const myAssets = await assetsRes.json();
-          setAssets(myAssets);
+          const allAssets = await assetsRes.json();
+          setAssets(allAssets);
+          // For badges, we'll just mock popular assets from their actual assets for now
+          // In a real app, you'd sort by a real 'subscribers' or 'views' count on the asset
+          setPopularAssets(allAssets.slice(0, 3));
         }
       } catch (error) {
         console.error("Failed to fetch profile data", error);
       }
     };
     fetchData();
-  }, [token, user]);
+  }, [token, targetUserId, isMe]);
 
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const handleEditProfile = () => {
+    setEditName(user?.name || '');
+    setEditBio(user?.bio || 'Digital pioneer exploring the boundaries of PEGASUS. Everything is an asset. AI is my second brain.');
+    setIsEditing(true);
+  };
+
+  const saveProfile = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: editName, bio: editBio })
+      });
+      if (res.ok) {
+        const updatedUser = await res.json();
+        login(token!, updatedUser);
+        setUser(updatedUser);
+        setIsEditing(false);
+      } else {
+        alert('Failed to update profile');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -64,25 +116,30 @@ const Profile: React.FC = () => {
       <div className="relative mb-12">
         <div className="h-48 w-full bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-3xl border border-white/10" />
         <div className="absolute -bottom-8 left-8 flex items-end gap-6">
-          <div className="w-32 h-32 bg-gray-900 border-4 border-black rounded-3xl flex items-center justify-center text-4xl font-bold shadow-2xl">
-            {user?.name?.[0] || 'U'}
+          <div className="w-32 h-32 bg-gray-900 border-4 border-black rounded-3xl flex items-center justify-center text-4xl font-bold shadow-2xl overflow-hidden">
+            {user?.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : (user?.name?.[0]?.toUpperCase() || 'U')}
           </div>
           <div className="mb-2">
             <h1 className="text-4xl font-black tracking-tight">{user?.name || 'Anonymous User'}</h1>
             <p className="text-gray-500 font-medium">@{user?.email?.split('@')[0] || 'username'}</p>
           </div>
         </div>
-        <div className="absolute bottom-4 right-8 flex gap-3">
-          <button 
-            onClick={handleLogout}
-            className="px-6 py-2 bg-red-500/10 text-red-500 font-bold rounded-xl hover:bg-red-500/20 transition-colors flex items-center gap-2"
-          >
-            <LogOut className="w-4 h-4" /> Logout
-          </button>
-          <button className="px-6 py-2 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center gap-2">
-            <Edit3 className="w-4 h-4" /> Edit Profile
-          </button>
-        </div>
+        {isMe && (
+          <div className="absolute bottom-4 right-8 flex gap-3">
+            <button 
+              onClick={handleLogout}
+              className="px-6 py-2 bg-red-500/10 text-red-500 font-bold rounded-xl hover:bg-red-500/20 transition-colors flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" /> Logout
+            </button>
+            <button 
+              onClick={handleEditProfile}
+              className="px-6 py-2 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center gap-2"
+            >
+              <Edit3 className="w-4 h-4" /> Edit Profile
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -91,7 +148,7 @@ const Profile: React.FC = () => {
           <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
             <h3 className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-500">About</h3>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
-              Digital pioneer exploring the boundaries of PEGASUS. Everything is an asset. AI is my second brain.
+              {user?.bio || 'Digital pioneer exploring the boundaries of PEGASUS. Everything is an asset. AI is my second brain.'}
             </p>
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm text-gray-500">
@@ -101,7 +158,7 @@ const Profile: React.FC = () => {
                 <Mail className="w-4 h-4" /> <span>{user?.email || 'not_set'}</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-gray-500">
-                <LinkIcon className="w-4 h-4" /> <span className="text-blue-400 hover:underline cursor-pointer">pegasus.io/u/me</span>
+                <LinkIcon className="w-4 h-4" /> <span className="text-blue-400 hover:underline cursor-pointer">pegasus.io/u/{user?.name?.toLowerCase().replace(/\s+/g, '')}</span>
               </div>
             </div>
           </div>
@@ -109,15 +166,17 @@ const Profile: React.FC = () => {
           <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
             <h3 className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-500">Badges</h3>
             <div className="flex flex-wrap gap-2">
-              <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400 border border-blue-500/20">
-                <Shield className="w-5 h-5" />
-              </div>
-              <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400 border border-purple-500/20">
-                <Zap className="w-5 h-5" />
-              </div>
-              <div className="p-2 bg-green-500/10 rounded-lg text-green-400 border border-green-500/20">
-                <Award className="w-5 h-5" />
-              </div>
+              {popularAssets.length > 0 ? (
+                popularAssets.map((asset, idx) => (
+                  <div key={asset.id} className="p-2 bg-blue-500/10 rounded-lg text-blue-400 border border-blue-500/20 relative group cursor-pointer" title={asset.title}>
+                    <div className="w-8 h-8 flex items-center justify-center font-black uppercase">
+                      {asset.title?.[0] || 'A'}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <span className="text-sm text-gray-500">No popular assets yet</span>
+              )}
             </div>
           </div>
         </aside>
@@ -189,6 +248,47 @@ const Profile: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Edit Profile Modal */}
+      {isEditing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-8 w-full max-w-md relative">
+            <button 
+              onClick={() => setIsEditing(false)}
+              className="absolute top-6 right-6 text-gray-500 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-2xl font-bold mb-6">Edit Profile</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Display Name</label>
+                <input 
+                  type="text" 
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Bio</label>
+                <textarea 
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
+                  rows={4}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 resize-none"
+                />
+              </div>
+              <button 
+                onClick={saveProfile}
+                disabled={isSaving}
+                className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+              >
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

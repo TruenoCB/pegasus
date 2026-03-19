@@ -102,8 +102,8 @@ const DynamicBackground: React.FC = () => {
         const parallaxX = (mouse.x - w / 2) * (i === 0 ? -0.05 : 0.05);
         const parallaxY = (mouse.y - h / 2) * (i === 0 ? -0.05 : 0.05);
         
-        // Breathing effect
-        const currentRadius = orb.baseRadius + Math.sin(orb.phase) * 50;
+        // Breathing effect, ensure radius is always positive
+        const currentRadius = Math.max(0.1, orb.baseRadius + Math.sin(orb.phase) * 50);
 
         const x = orb.x + parallaxX;
         const y = orb.y + parallaxY;

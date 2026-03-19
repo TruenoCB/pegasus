@@ -75,6 +75,32 @@ func (s *RSSService) GetUserGroups(userID string) ([]models.RSSGroup, error) {
 	return groups, err
 }
 
+func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, promptConfig string) error {
+	var group models.RSSGroup
+
+	// First check if the group exists and belongs to the user
+	err := s.db.Joins("JOIN assets ON assets.id = rss_groups.asset_id").
+		Where("rss_groups.id = ? AND assets.user_id = ?", groupID, userID).
+		First(&group).Error
+
+	if err != nil {
+		return err
+	}
+
+	urlsJson, _ := json.Marshal(urls)
+
+	// Update both Asset and Group
+	s.db.Model(&models.Asset{}).Where("id = ?", group.AssetID).Updates(map[string]interface{}{
+		"title": name,
+	})
+
+	return s.db.Model(&group).Updates(map[string]interface{}{
+		"name":          name,
+		"feed_configs":  string(urlsJson),
+		"prompt_config": promptConfig,
+	}).Error
+}
+
 func (s *RSSService) SaveSummaryReport(userID, groupID, title, content string) (*models.SummaryReport, error) {
 	// Create Asset first
 	asset := models.Asset{

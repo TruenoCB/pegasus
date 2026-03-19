@@ -27,6 +27,12 @@ const Aurora: React.FC = () => {
 
     // Group creation state
     const [showGroupModal, setShowGroupModal] = useState(false);
+    // Group editing state
+    const [editingGroup, setEditingGroup] = useState<any | null>(null);
+    const [editGroupName, setEditGroupName] = useState('');
+    const [editGroupUrls, setEditGroupUrls] = useState('');
+    const [editGroupPrompt, setEditGroupPrompt] = useState('');
+    const [savingGroup, setSavingGroup] = useState(false);
     const [groupName, setGroupName] = useState('');
     const [groupEmails, setGroupEmails] = useState('');
     const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
@@ -215,6 +221,63 @@ const Aurora: React.FC = () => {
             alert('Error generating report');
         } finally {
             setGeneratingReportFor(null);
+        }
+    };
+
+    const handleEditGroup = (group: any) => {
+        setEditingGroup(group);
+        setEditGroupName(group.name);
+        try {
+            const urls = JSON.parse(group.feed_configs || '[]');
+            setEditGroupUrls(urls.join('\n'));
+        } catch {
+            setEditGroupUrls('');
+        }
+        setEditGroupPrompt(group.prompt_config || '');
+    };
+
+    const handleSaveGroup = async () => {
+        if (!editingGroup) return;
+        const urls = editGroupUrls.split('\n').map(u => u.trim()).filter(u => u);
+        if (!editGroupName || urls.length === 0) {
+            alert('Name and at least one URL are required.');
+            return;
+        }
+
+        setSavingGroup(true);
+        try {
+            const res = await fetch(`/api/rss/groups/${editingGroup.id}`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ 
+                    name: editGroupName,
+                    urls: urls,
+                    prompt_config: editGroupPrompt
+                }),
+            });
+            if (res.ok) {
+                alert('Group updated successfully!');
+                setEditingGroup(null);
+                
+                // Refresh my groups
+                const groupsRes = await fetch('/api/rss/groups/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (groupsRes.ok) {
+                    setMyGroups(await groupsRes.json());
+                }
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Failed to update group');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error updating group');
+        } finally {
+            setSavingGroup(false);
         }
     };
 
@@ -500,12 +563,70 @@ const Aurora: React.FC = () => {
                                             >
                                                 {generatingReportFor === group.id ? 'Generating...' : 'Generate AI Report'}
                                             </button>
-                                            <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors">
+                                            <button 
+                                                onClick={() => handleEditGroup(group)}
+                                                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+                                            >
                                                 <Settings className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {/* Edit Group Modal */}
+                        {editingGroup && (
+                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                                <div className="bg-zinc-900 border border-white/10 rounded-3xl p-8 w-full max-w-md">
+                                    <h3 className="text-2xl font-bold mb-6">Edit RSS Group</h3>
+                                    
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Group Name</label>
+                                            <input 
+                                                type="text" 
+                                                value={editGroupName}
+                                                onChange={e => setEditGroupName(e.target.value)}
+                                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30"
+                                            />
+                                        </div>
+                                        
+                                        <div className="pt-2">
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">RSS URLs (one per line)</label>
+                                            <textarea 
+                                                value={editGroupUrls}
+                                                onChange={e => setEditGroupUrls(e.target.value)}
+                                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 h-32 resize-none"
+                                            />
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">AI Prompt</label>
+                                            <textarea 
+                                                value={editGroupPrompt}
+                                                onChange={e => setEditGroupPrompt(e.target.value)}
+                                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 h-24 resize-none text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 mt-8">
+                                        <button 
+                                            onClick={() => setEditingGroup(null)}
+                                            className="flex-1 py-3 px-4 rounded-xl font-bold bg-white/5 hover:bg-white/10 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            onClick={handleSaveGroup}
+                                            disabled={savingGroup || !editGroupName || !editGroupUrls.trim()}
+                                            className="flex-1 py-3 px-4 rounded-xl font-bold bg-white text-black hover:bg-gray-200 transition-colors disabled:opacity-50"
+                                        >
+                                            {savingGroup ? 'Saving...' : 'Save Changes'}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </section>
