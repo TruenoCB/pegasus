@@ -48,6 +48,11 @@ func main() {
 	notificationService := services.NewNotificationService(cfg)
 	reportService := services.NewReportService(db, rssService, aiService, notificationService)
 
+	// Initialize and Start Scheduler
+	schedulerService := services.NewSchedulerService(db, reportService)
+	schedulerService.Start()
+	defer schedulerService.Stop()
+
 	// Initialize Handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	aiHandler := handlers.NewAIHandler(aiService, esService)
