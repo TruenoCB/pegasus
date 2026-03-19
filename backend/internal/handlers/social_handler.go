@@ -17,19 +17,19 @@ func NewSocialHandler(socialService *services.SocialService) *SocialHandler {
 }
 
 type CreatePostRequest struct {
-	Content string  `json:"content" binding:"required"`
-	AssetID *string `json:"asset_id"`
+	Content string `json:"content" binding:"required"`
 }
 
 func (h *SocialHandler) CreatePost(c *gin.Context) {
 	userID := c.GetString("user_id")
+
 	var req CreatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	post, err := h.socialService.CreatePost(userID, req.Content, req.AssetID)
+	post, err := h.socialService.CreatePost(userID, req.Content)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -47,6 +47,75 @@ func (h *SocialHandler) GetPosts(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, posts)
+}
+
+func (h *SocialHandler) LikePost(c *gin.Context) {
+	userID := c.GetString("user_id")
+	postID := c.Param("id")
+
+	if err := h.socialService.LikePost(userID, postID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
+type CommentRequest struct {
+	Content string `json:"content" binding:"required"`
+}
+
+func (h *SocialHandler) CommentPost(c *gin.Context) {
+	userID := c.GetString("user_id")
+	postID := c.Param("id")
+	
+	var req CommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	comment, err := h.socialService.CommentPost(userID, postID, req.Content)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, comment)
+}
+
+func (h *SocialHandler) ToggleFollow(c *gin.Context) {
+	followerID := c.GetString("user_id")
+	followingID := c.Param("id")
+
+	if err := h.socialService.ToggleFollow(followerID, followingID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
+func (h *SocialHandler) GetUserAssets(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	assets, err := h.socialService.GetUserAssets(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, assets)
+}
+
+func (h *SocialHandler) GetProfileStats(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "me" {
+		userID = c.GetString("user_id")
+	}
+
+	stats, err := h.socialService.GetProfileStats(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
 }
 
 type SendMessageRequest struct {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -8,20 +8,29 @@ import Aurora from './pages/Aurora';
 import Social from './pages/Social';
 import Chat from './pages/Chat';
 import Profile from './pages/Profile';
+import { useAuthStore } from './store/authStore';
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { token } = useAuthStore();
+  if (!token) return <Navigate to="/login" />;
+  return <>{children}</>;
+};
 
 function App() {
   return (
-    <Layout>
+    <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/aurora" element={<Aurora />} />
-        <Route path="/social" element={<Social />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route element={<Layout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/aurora" element={<ProtectedRoute><Aurora /></ProtectedRoute>} />
+          <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
+          <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        </Route>
       </Routes>
-    </Layout>
+    </Router>
   );
 }
 

@@ -35,8 +35,11 @@ func main() {
 			&models.SocialRelation{},
 			&models.Report{},
 			&models.Post{},
+			&models.Like{},
+			&models.Comment{},
 			&models.Message{},
 			&models.PopularSource{},
+			&models.SummaryReport{},
 		)
 
 		// Seed dummy popular sources for demo
@@ -64,7 +67,7 @@ func main() {
 	// Initialize Handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	aiHandler := handlers.NewAIHandler(aiService, esService)
-	rssHandler := handlers.NewRSSHandler(rssService)
+	rssHandler := handlers.NewRSSHandler(rssService, aiService)
 	reportHandler := handlers.NewReportHandler(reportService)
 	socialHandler := handlers.NewSocialHandler(socialService)
 
@@ -107,6 +110,9 @@ func main() {
 			protected.POST("/rss/fetch", rssHandler.Fetch)
 			protected.POST("/rss/process", rssHandler.Process)
 			protected.POST("/rss/group", rssHandler.CreateGroup)
+			protected.GET("/rss/groups/me", rssHandler.GetMyGroups)
+			protected.POST("/rss/groups/report", rssHandler.GenerateGroupReport)
+			protected.GET("/rss/reports/me", rssHandler.GetSummaryReports)
 			protected.GET("/rss/popular", rssHandler.GetPopularSources)
 
 			protected.POST("/report/generate", reportHandler.Generate)
@@ -114,6 +120,11 @@ func main() {
 			// Social
 			protected.POST("/social/posts", socialHandler.CreatePost)
 			protected.GET("/social/posts", socialHandler.GetPosts)
+			protected.POST("/social/posts/:id/like", socialHandler.LikePost)
+			protected.POST("/social/posts/:id/comment", socialHandler.CommentPost)
+			protected.POST("/social/users/:id/follow", socialHandler.ToggleFollow)
+			protected.GET("/social/users/:id/stats", socialHandler.GetProfileStats)
+			protected.GET("/social/users/me/assets", socialHandler.GetUserAssets)
 
 			// Chat
 			protected.GET("/chat/users", socialHandler.GetUsers)

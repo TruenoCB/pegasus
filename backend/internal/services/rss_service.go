@@ -23,7 +23,7 @@ func NewRSSService(db *gorm.DB) *RSSService {
 	}
 }
 
-func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, emails []string) (*models.RSSGroup, error) {
+func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, emails []string, promptConfig string) (*models.RSSGroup, error) {
 	urlsJson, _ := json.Marshal(urls)
 	emailsJson, _ := json.Marshal(emails)
 
@@ -44,12 +44,66 @@ func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, email
 		Description:        desc,
 		FeedConfigs:        string(urlsJson),
 		NotificationEmails: string(emailsJson),
+		PromptConfig:       promptConfig,
 	}
 	if err := s.db.Create(&group).Error; err != nil {
 		return nil, err
 	}
 
 	return &group, nil
+}
+
+func (s *RSSService) GetGroupByID(groupID string) (*models.RSSGroup, error) {
+	var group models.RSSGroup
+	err := s.db.Where("id = ?", groupID).First(&group).Error
+	return &group, err
+}
+
+func (s *RSSService) GetUserGroups(userID string) ([]models.RSSGroup, error) {
+	var groups []models.RSSGroup
+	// Join with Assets to get groups for this user
+	err := s.db.Table("rss_groups").
+		Select("rss_groups.*").
+		Joins("JOIN assets ON assets.id = rss_groups.asset_id").
+		Where("assets.user_id = ?", userID).
+		Find(&groups).Error
+	return groups, err
+}
+
+func (s *RSSService) SaveSummaryReport(userID, groupID, title, content string) (*models.SummaryReport, error) {
+	// Create Asset first
+	asset := models.Asset{
+		UserID:      userID,
+		Type:        "SUMMARY_REPORT",
+		Title:       title,
+		Description: "AI Generated Summary Report",
+	}
+	if err := s.db.Create(&asset).Error; err != nil {
+		return nil, err
+	}
+
+	report := models.SummaryReport{
+		AssetID: asset.ID,
+		GroupID: &groupID,
+		Title:   title,
+		Content: content,
+	}
+	if err := s.db.Create(&report).Error; err != nil {
+		return nil, err
+	}
+
+	return &report, nil
+}
+
+func (s *RSSService) GetSummaryReports(userID string) ([]models.SummaryReport, error) {
+	var reports []models.SummaryReport
+	err := s.db.Table("summary_reports").
+		Select("summary_reports.*").
+		Joins("JOIN assets ON assets.id = summary_reports.asset_id").
+		Where("assets.user_id = ?", userID).
+		Order("summary_reports.created_at desc").
+		Find(&reports).Error
+	return reports, err
 }
 
 func (s *RSSService) FetchAndParse(url string) (*models.RSSFeed, []models.AISummary, error) {

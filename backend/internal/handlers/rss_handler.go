@@ -1,18 +1,22 @@
 package handlers
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"time"
 	"pegasus/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
 
-type RSSHandler struct {
-	rssService *services.RSSService
+func NewRSSHandler(rss *services.RSSService, ai *services.AIService) *RSSHandler {
+	return &RSSHandler{rssService: rss, aiService: ai}
 }
 
-func NewRSSHandler(rss *services.RSSService) *RSSHandler {
-	return &RSSHandler{rssService: rss}
+type RSSHandler struct {
+	rssService *services.RSSService
+	aiService  *services.AIService
 }
 
 type ProcessRequest struct {
@@ -71,10 +75,11 @@ func (h *RSSHandler) Fetch(c *gin.Context) {
 }
 
 type CreateGroupRequest struct {
-	Name        string   `json:"name" binding:"required"`
-	Description string   `json:"description"`
-	URLs        []string `json:"urls" binding:"required"`
-	Emails      []string `json:"emails"`
+	Name         string   `json:"name" binding:"required"`
+	Description  string   `json:"description"`
+	URLs         []string `json:"urls" binding:"required"`
+	Emails       []string `json:"emails"`
+	PromptConfig string   `json:"prompt_config"`
 }
 
 func (h *RSSHandler) GetPopularSources(c *gin.Context) {
@@ -89,10 +94,8 @@ func (h *RSSHandler) GetPopularSources(c *gin.Context) {
 func (h *RSSHandler) CreateGroup(c *gin.Context) {
 	userID := c.GetString("user_id") // From middleware
 	if userID == "" {
-		// Fallback for dev/test without auth middleware, but ideally should be protected
-		// c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		// return
-		userID = "test-user-id" // Temporary hack if middleware not set
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
 	}
 
 	var req CreateGroupRequest
@@ -101,11 +104,107 @@ func (h *RSSHandler) CreateGroup(c *gin.Context) {
 		return
 	}
 
-	group, err := h.rssService.CreateGroup(userID, req.Name, req.Description, req.URLs, req.Emails)
+	group, err := h.rssService.CreateGroup(userID, req.Name, req.Description, req.URLs, req.Emails, req.PromptConfig)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, group)
+}
+
+func (h *RSSHandler) GetMyGroups(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	groups, err := h.rssService.GetUserGroups(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, groups)
+}
+
+type GenerateGroupReportRequest struct {
+	GroupID string `json:"group_id" binding:"required"`
+}
+
+func (h *RSSHandler) GenerateGroupReport(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var req GenerateGroupReportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 1. Get Group details
+	group, err := h.rssService.GetGroupByID(req.GroupID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "group not found"})
+		return
+	}
+
+	// 2. Fetch all feeds
+	var urls []string
+	if err := json.Unmarshal([]byte(group.FeedConfigs), &urls); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid feed configs"})
+		return
+	}
+
+	var allItemsContent string
+	for _, url := range urls {
+		_, items, err := h.rssService.FetchAndParse(url)
+		if err == nil {
+			for _, item := range items {
+				// Only take the first 500 chars to avoid huge context
+				content := item.OriginalContent
+				if len(content) > 500 {
+					content = content[:500] + "..."
+				}
+				allItemsContent += fmt.Sprintf("Title: %s\nContent: %s\n\n", item.OriginalTitle, content)
+			}
+		}
+	}
+
+	// 3. Generate AI Report using prompt config
+	reportContent, err := h.aiService.GenerateReport(allItemsContent, group.PromptConfig)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate report: " + err.Error()})
+		return
+	}
+
+	// 4. Save as permanent asset
+	title := fmt.Sprintf("Report for %s - %s", group.Name, time.Now().Format("2006-01-02"))
+	report, err := h.rssService.SaveSummaryReport(userID, group.ID, title, reportContent)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save report"})
+		return
+	}
+
+	c.JSON(http.StatusOK, report)
+}
+
+func (h *RSSHandler) GetSummaryReports(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	reports, err := h.rssService.GetSummaryReports(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, reports)
 }

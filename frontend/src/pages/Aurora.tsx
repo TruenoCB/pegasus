@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { 
   Plus, Rss, Loader2, Compass, TrendingUp, 
-  Newspaper, Cpu, Globe, Share2, Bookmark, FolderPlus, Send
+  Newspaper, Cpu, Globe, Share2, Bookmark, FolderPlus, Send, Settings
 } from 'lucide-react';
 
 // 推荐的 RSS 源列表 (模拟社区推荐)
@@ -18,12 +18,20 @@ const Aurora: React.FC = () => {
     
     // Popular sources state
     const [popularSources, setPopularSources] = useState<any[]>([]);
+    
+    // My groups & reports state
+    const [myGroups, setMyGroups] = useState<any[]>([]);
+    const [myReports, setMyReports] = useState<any[]>([]);
+    const [generatingReportFor, setGeneratingReportFor] = useState<string | null>(null);
+    const [selectedReport, setSelectedReport] = useState<any | null>(null);
 
     // Group creation state
     const [showGroupModal, setShowGroupModal] = useState(false);
     const [groupName, setGroupName] = useState('');
     const [groupEmails, setGroupEmails] = useState('');
     const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
+    const [customUrls, setCustomUrls] = useState('');
+    const [promptConfig, setPromptConfig] = useState('Please summarize the key points, extracting the most important insights and technical details. Format the output in Markdown.');
     const [creatingGroup, setCreatingGroup] = useState(false);
 
     useEffect(() => {
@@ -40,9 +48,39 @@ const Aurora: React.FC = () => {
                 console.error("Failed to fetch popular sources", error);
             }
         };
+
+        const fetchMyGroups = async () => {
+            try {
+                const res = await fetch('/api/rss/groups/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setMyGroups(data || []);
+                }
+            } catch (error) {
+                console.error("Failed to fetch my groups", error);
+            }
+        };
+        
+        const fetchMyReports = async () => {
+            try {
+                const res = await fetch('/api/rss/reports/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setMyReports(data || []);
+                }
+            } catch (error) {
+                console.error("Failed to fetch my reports", error);
+            }
+        };
         
         if (token) {
             fetchPopularSources();
+            fetchMyGroups();
+            fetchMyReports();
         }
     }, [token]);
 
@@ -86,7 +124,10 @@ const Aurora: React.FC = () => {
     };
 
     const handleCreateGroup = async () => {
-        if (!groupName || selectedUrls.length === 0) return;
+        const customUrlList = customUrls.split('\n').map(u => u.trim()).filter(u => u);
+        const allUrls = [...new Set([...selectedUrls, ...customUrlList])];
+        
+        if (!groupName || allUrls.length === 0) return;
         
         setCreatingGroup(true);
         try {
@@ -98,9 +139,10 @@ const Aurora: React.FC = () => {
                 },
                 body: JSON.stringify({ 
                     name: groupName,
-                    description: `Group created with ${selectedUrls.length} feeds`,
-                    urls: selectedUrls,
-                    emails: groupEmails.split(',').map(e => e.trim()).filter(e => e)
+                    description: `Group created with ${allUrls.length} feeds`,
+                    urls: allUrls,
+                    emails: groupEmails.split(',').map(e => e.trim()).filter(e => e),
+                    prompt_config: promptConfig
                 }),
             });
             const data = await res.json();
@@ -110,6 +152,16 @@ const Aurora: React.FC = () => {
                 setGroupName('');
                 setGroupEmails('');
                 setSelectedUrls([]);
+                setCustomUrls('');
+                setPromptConfig('Please summarize the key points, extracting the most important insights and technical details. Format the output in Markdown.');
+                
+                // Refresh my groups
+                const groupsRes = await fetch('/api/rss/groups/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (groupsRes.ok) {
+                    setMyGroups(await groupsRes.json());
+                }
             } else {
                 alert(data.error || 'Failed to create group');
             }
@@ -118,6 +170,43 @@ const Aurora: React.FC = () => {
             alert('Error creating group');
         } finally {
             setCreatingGroup(false);
+        }
+    };
+
+    const handleGenerateReport = async (groupId: string) => {
+        setGeneratingReportFor(groupId);
+        try {
+            const res = await fetch('/api/rss/groups/report', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ group_id: groupId }),
+            });
+            if (res.ok) {
+                const report = await res.json();
+                alert('Report generated successfully!');
+                
+                // Refresh reports and open the results tab
+                const reportsRes = await fetch('/api/rss/reports/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (reportsRes.ok) {
+                    setMyReports(await reportsRes.json());
+                }
+                
+                setSelectedReport(report);
+                setActiveTab('results');
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Failed to generate report');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error generating report');
+        } finally {
+            setGeneratingReportFor(null);
         }
     };
 
@@ -177,15 +266,25 @@ const Aurora: React.FC = () => {
                         {activeTab === 'discover' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />}
                     </button>
                     <button 
-                        onClick={() => setActiveTab('results')}
+                        onClick={() => setActiveTab('my_groups')}
+                        className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'my_groups' ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        <span className="flex items-center gap-2"><FolderPlus className="w-4 h-4" /> My Groups</span>
+                        {activeTab === 'my_groups' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />}
+                    </button>
+                    <button 
+                        onClick={() => {
+                            setActiveTab('results');
+                            setSelectedReport(null);
+                        }}
                         className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'results' ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
                     >
-                        <span className="flex items-center gap-2"><Newspaper className="w-4 h-4" /> AI Summaries {summaries.length > 0 && `(${summaries.length})`}</span>
+                        <span className="flex items-center gap-2"><Newspaper className="w-4 h-4" /> AI Summaries {myReports.length > 0 && `(${myReports.length})`}</span>
                         {activeTab === 'results' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />}
                     </button>
                 </div>
 
-                {activeTab === 'discover' ? (
+                {activeTab === 'discover' && (
                     <section className="animate-in fade-in duration-500">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -216,19 +315,28 @@ const Aurora: React.FC = () => {
                                             onChange={() => toggleUrlSelection(feed.url)}
                                         />
                                     </div>
-                                    <div className="mb-4 text-gray-400 cursor-pointer" onClick={() => handleProcess(feed.url)}>
+                                    <div className="mb-4 text-gray-400 cursor-pointer" onClick={() => {
+                                        setSelectedUrls(prev => prev.includes(feed.url) ? prev.filter(u => u !== feed.url) : [...prev, feed.url]);
+                                    }}>
                                         {getIconComponent(feed.icon_type)}
                                     </div>
-                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1 cursor-pointer" onClick={() => handleProcess(feed.url)}>
+                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1 cursor-pointer" onClick={() => {
+                                        setSelectedUrls(prev => prev.includes(feed.url) ? prev.filter(u => u !== feed.url) : [...prev, feed.url]);
+                                    }}>
                                         {feed.category}
                                     </div>
-                                    <h3 className="text-xl font-bold mb-2 cursor-pointer" onClick={() => handleProcess(feed.url)}>{feed.name}</h3>
+                                    <h3 className="text-xl font-bold mb-2 cursor-pointer" onClick={() => {
+                                        setSelectedUrls(prev => prev.includes(feed.url) ? prev.filter(u => u !== feed.url) : [...prev, feed.url]);
+                                    }}>{feed.name}</h3>
                                     <div className="text-xs text-gray-500 mb-4">{feed.subscribers} subscribers</div>
                                     <button 
-                                        onClick={() => handleProcess(feed.url)}
+                                        onClick={() => {
+                                            setSelectedUrls([feed.url]);
+                                            setShowGroupModal(true);
+                                        }}
                                         className="text-sm font-semibold py-2 px-4 bg-white/10 rounded-full hover:bg-white hover:text-black transition-all"
                                     >
-                                        Quick Analyze
+                                        Create Group
                                     </button>
                                 </div>
                             ))}
@@ -264,10 +372,30 @@ const Aurora: React.FC = () => {
                                         </div>
 
                                         <div className="pt-2">
-                                            <p className="text-sm text-gray-400 mb-2">Selected Feeds ({selectedUrls.length}):</p>
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Custom RSS URLs (one per line)</label>
+                                            <textarea 
+                                                value={customUrls}
+                                                onChange={e => setCustomUrls(e.target.value)}
+                                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 h-24 resize-none"
+                                                placeholder="https://example.com/feed.xml&#10;https://blog.com/rss"
+                                            />
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">AI Prompt (Language & Instructions)</label>
+                                            <textarea 
+                                                value={promptConfig}
+                                                onChange={e => setPromptConfig(e.target.value)}
+                                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 h-24 resize-none text-sm"
+                                                placeholder="e.g. Please summarize the key points in Chinese, extracting the most important insights..."
+                                            />
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <p className="text-sm text-gray-400 mb-2">Selected from Popular ({selectedUrls.length}):</p>
                                             <div className="flex flex-wrap gap-2">
                                                 {selectedUrls.length === 0 ? (
-                                                    <span className="text-xs text-red-400">Please select at least one feed from the Discover tab first.</span>
+                                                    <span className="text-xs text-gray-500">None selected</span>
                                                 ) : (
                                                     popularSources.filter(f => selectedUrls.includes(f.url)).map(f => (
                                                         <span key={f.name} className="text-xs px-2 py-1 bg-white/10 rounded-md">{f.name}</span>
@@ -286,7 +414,7 @@ const Aurora: React.FC = () => {
                                         </button>
                                         <button 
                                             onClick={handleCreateGroup}
-                                            disabled={creatingGroup || !groupName || selectedUrls.length === 0}
+                                            disabled={creatingGroup || !groupName || (selectedUrls.length === 0 && !customUrls.trim())}
                                             className="flex-1 py-3 px-4 rounded-xl font-bold bg-white text-black hover:bg-gray-200 transition-colors disabled:opacity-50"
                                         >
                                             {creatingGroup ? 'Creating...' : 'Create Group'}
@@ -296,52 +424,124 @@ const Aurora: React.FC = () => {
                             </div>
                         )}
                     </section>
-                ) : (
-                    <section className="animate-in slide-in-from-bottom-4 duration-500">
-                        {summaries.length === 0 ? (
+                )}
+
+                {activeTab === 'my_groups' && (
+                    <section className="animate-in fade-in duration-500">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-2xl font-bold flex items-center gap-2">
+                                My RSS Groups
+                            </h2>
+                            <button 
+                                onClick={() => {
+                                    setShowGroupModal(true);
+                                    setActiveTab('discover'); // Switch to discover to pick feeds
+                                }}
+                                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors"
+                            >
+                                <FolderPlus className="w-4 h-4" /> Create New
+                            </button>
+                        </div>
+                        
+                        {myGroups.length === 0 ? (
                             <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-3xl">
-                                <p className="text-gray-500 text-lg">No summaries yet. Try adding a feed from the Discover tab.</p>
+                                <p className="text-gray-500 text-lg">You haven't created any RSS groups yet.</p>
+                                <button 
+                                    onClick={() => setActiveTab('discover')}
+                                    className="mt-4 text-blue-400 hover:underline"
+                                >
+                                    Go to Discover to create one
+                                </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {summaries.map((item, idx) => (
-                                    <article 
-                                        key={idx} 
-                                        className="flex flex-col bg-white/5 rounded-3xl p-8 border border-white/10 hover:border-white/30 hover:bg-white/[0.07] transition-all group"
-                                    >
-                                        <div className="flex justify-between items-start mb-6">
-                                            <div className="px-3 py-1 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                                AI Generated
-                                            </div>
-                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white">
-                                                    <Bookmark className="w-4 h-4" />
-                                                </button>
-                                                <button className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white">
-                                                    <Share2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {myGroups.map((group) => (
+                                    <div key={group.id} className="p-6 bg-white/5 border border-white/10 rounded-3xl">
+                                        <h3 className="text-xl font-bold mb-2">{group.name}</h3>
+                                        <p className="text-gray-400 text-sm mb-4">{group.description}</p>
+                                        <div className="text-xs text-gray-500 mb-4">
+                                            {(() => {
+                                                try { return JSON.parse(group.feed_configs || '[]').length; }
+                                                catch { return 0; }
+                                            })()} feeds configured
                                         </div>
-                                        
-                                        <h3 className="text-2xl font-bold mb-4 leading-tight group-hover:text-blue-400 transition-colors">
-                                            <a href={item.link} target="_blank" rel="noopener noreferrer">
-                                                {item.title}
-                                            </a>
-                                        </h3>
-                                        
-                                        <div className="text-gray-400 leading-relaxed mb-8 flex-1 text-sm line-clamp-6">
-                                            {item.summary}
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={() => handleGenerateReport(group.id)}
+                                                disabled={generatingReportFor === group.id}
+                                                className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                                            >
+                                                {generatingReportFor === group.id ? 'Generating...' : 'Generate AI Report'}
+                                            </button>
+                                            <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors">
+                                                <Settings className="w-4 h-4" />
+                                            </button>
                                         </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                )}
 
-                                        <div className="space-y-3 border-t border-white/5 pt-6 mt-auto">
-                                            {item.keyPoints && item.keyPoints.slice(0, 3).map((point: string, i: number) => (
-                                                <div key={i} className="flex items-start gap-2 text-xs text-gray-500">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-white/20 mt-1.5 flex-shrink-0" />
-                                                    <span className="line-clamp-1">{point}</span>
-                                                </div>
-                                            ))}
+                {activeTab === 'results' && (
+                    <section className="animate-in slide-in-from-bottom-4 duration-500">
+                        {selectedReport ? (
+                            <div className="bg-white/5 border border-white/10 rounded-3xl p-8 relative">
+                                <button 
+                                    onClick={() => setSelectedReport(null)}
+                                    className="absolute top-8 right-8 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-colors"
+                                >
+                                    Back to Reports
+                                </button>
+                                <h2 className="text-3xl font-black mb-2 pr-32">{selectedReport.title}</h2>
+                                <p className="text-gray-500 mb-8">{new Date(selectedReport.created_at).toLocaleString()}</p>
+                                <div className="prose prose-invert max-w-none">
+                                    {/* A simple markdown renderer logic. In real app, use react-markdown */}
+                                    {selectedReport.content.split('\n').map((line: string, i: number) => {
+                                        if (line.startsWith('# ')) return <h1 key={i} className="text-2xl font-bold mt-6 mb-4">{line.substring(2)}</h1>;
+                                        if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold mt-5 mb-3">{line.substring(3)}</h2>;
+                                        if (line.startsWith('### ')) return <h3 key={i} className="text-lg font-bold mt-4 mb-2">{line.substring(4)}</h3>;
+                                        if (line.startsWith('- ')) return <li key={i} className="ml-4 mb-1">{line.substring(2)}</li>;
+                                        if (line.trim() === '') return <br key={i} />;
+                                        return <p key={i} className="mb-4 text-gray-300 leading-relaxed">{line}</p>;
+                                    })}
+                                </div>
+                                <div className="flex gap-4 mt-8 pt-8 border-t border-white/10">
+                                    <button className="flex items-center gap-2 px-6 py-3 bg-white text-black rounded-xl font-bold hover:bg-gray-200 transition-colors">
+                                        <Share2 className="w-4 h-4" /> Share Asset
+                                    </button>
+                                    <button className="flex items-center gap-2 px-6 py-3 bg-white/10 rounded-xl font-bold hover:bg-white/20 transition-colors">
+                                        <Bookmark className="w-4 h-4" /> Save
+                                    </button>
+                                </div>
+                            </div>
+                        ) : myReports.length === 0 ? (
+                            <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-3xl">
+                                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Newspaper className="w-8 h-8 text-gray-500" />
+                                </div>
+                                <h3 className="text-xl font-bold mb-2">No Reports Yet</h3>
+                                <p className="text-gray-500">Generate an AI report from one of your RSS groups to see it here.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 gap-4">
+                                {myReports.map((report) => (
+                                    <div 
+                                        key={report.id} 
+                                        onClick={() => setSelectedReport(report)}
+                                        className="bg-white/5 border border-white/10 rounded-3xl p-6 hover:bg-white/10 transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex justify-between items-start mb-4">
+                                            <h3 className="text-xl font-bold group-hover:text-blue-400 transition-colors">{report.title}</h3>
+                                            <span className="text-xs text-gray-500 whitespace-nowrap ml-4">
+                                                {new Date(report.created_at).toLocaleDateString()}
+                                            </span>
                                         </div>
-                                    </article>
+                                        <p className="text-gray-400 text-sm line-clamp-2">
+                                            {report.content.replace(/[#*`]/g, '').substring(0, 150)}...
+                                        </p>
+                                    </div>
                                 ))}
                             </div>
                         )}

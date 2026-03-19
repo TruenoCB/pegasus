@@ -21,27 +21,35 @@ type User struct {
 type Asset struct {
 	ID          string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
 	UserID      string    `gorm:"type:varchar(36);not null;index" json:"user_id"`
-	Type        string    `gorm:"type:enum('RSS_GROUP', 'REPORT', 'POST', 'COLLECTION');not null" json:"type"`
-	Title       string    `gorm:"type:varchar(255);not null" json:"title"`
+	User        User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Type        string    `gorm:"type:varchar(50);not null;index" json:"type"` // e.g., 'RSS_GROUP', 'POST', 'SUMMARY_REPORT'
+	Title       string    `gorm:"type:varchar(255)" json:"title"`
 	Description string    `gorm:"type:text" json:"description"`
-	IsPublic    bool      `gorm:"default:false;index" json:"is_public"`
-	IsCopyable  bool      `gorm:"default:false" json:"is_copyable"`
-	Metadata    string    `gorm:"type:json" json:"metadata"` // Stored as JSON string
+	Data        string    `gorm:"type:json" json:"data"` // Flexible storage for asset-specific data
+	IsPublic    bool      `gorm:"default:false" json:"is_public"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
-	RSSGroup    RSSGroup  `gorm:"foreignKey:AssetID" json:"rss_group,omitempty"`
 }
 
 type RSSGroup struct {
 	ID                 string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
-	AssetID            string    `gorm:"type:varchar(36);not null;index" json:"asset_id"`
+	AssetID            string    `gorm:"type:varchar(36);not null;index;unique" json:"asset_id"` // Links to Asset table, 1-to-1
 	Name               string    `gorm:"type:varchar(255);not null" json:"name"`
 	Description        string    `gorm:"type:text" json:"description"`
-	FeedConfigs        string    `gorm:"type:json" json:"feed_configs"` // List of feed URLs
-	ReportFrequency    string    `gorm:"type:enum('daily', 'weekly', 'monthly');default:'weekly'" json:"report_frequency"`
-	NotificationEmails string    `gorm:"type:json" json:"notification_emails"` // JSON array of emails
+	FeedConfigs        string    `gorm:"type:text" json:"feed_configs"`        // JSON array of feed URLs
+	NotificationEmails string    `gorm:"type:text" json:"notification_emails"` // JSON array of emails
+	PromptConfig       string    `gorm:"type:text" json:"prompt_config"`       // Custom prompt for AI summarization
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+type SummaryReport struct {
+	ID        string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	AssetID   string    `gorm:"type:varchar(36);not null;index;unique" json:"asset_id"` // Links to Asset table, 1-to-1
+	GroupID   *string   `gorm:"type:varchar(36);index" json:"group_id,omitempty"`       // The RSS Group it was generated from
+	Title     string    `gorm:"type:varchar(255);not null" json:"title"`
+	Content   string    `gorm:"type:text;not null" json:"content"` // The Markdown summary content
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Report struct {
@@ -84,13 +92,30 @@ type SocialRelation struct {
 
 type Post struct {
 	ID        string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	AssetID   *string   `gorm:"type:varchar(36);index;unique" json:"asset_id,omitempty"` // Links to Asset table, 1-to-1 (Optional for legacy posts)
 	UserID    string    `gorm:"type:varchar(36);not null;index" json:"user_id"`
 	User      User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Content   string    `gorm:"type:text;not null" json:"content"`
-	AssetID   *string   `gorm:"type:varchar(36);index" json:"asset_id,omitempty"` // Optional attached asset
-	Asset     *Asset    `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
+	Likes     []Like    `gorm:"foreignKey:PostID" json:"likes,omitempty"`
+	Comments  []Comment `gorm:"foreignKey:PostID" json:"comments,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type Like struct {
+	ID        string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	PostID    string    `gorm:"type:varchar(36);not null;index" json:"post_id"`
+	UserID    string    `gorm:"type:varchar(36);not null;index" json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Comment struct {
+	ID        string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	PostID    string    `gorm:"type:varchar(36);not null;index" json:"post_id"`
+	UserID    string    `gorm:"type:varchar(36);not null;index" json:"user_id"`
+	User      User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Content   string    `gorm:"type:text;not null" json:"content"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Message struct {
@@ -103,10 +128,10 @@ type Message struct {
 }
 
 type PopularSource struct {
-	ID          string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
-	Name        string    `gorm:"type:varchar(255);not null" json:"name"`
-	URL         string    `gorm:"uniqueIndex;type:varchar(500);not null" json:"url"`
-	Category    string    `gorm:"type:varchar(100)" json:"category"`
-	IconType    string    `gorm:"type:varchar(50)" json:"icon_type"` // e.g. "Cpu", "TrendingUp"
-	Subscribers int       `gorm:"default:0" json:"subscribers"`
+	ID          string `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	Name        string `gorm:"type:varchar(255);not null" json:"name"`
+	URL         string `gorm:"uniqueIndex;type:varchar(500);not null" json:"url"`
+	Category    string `gorm:"type:varchar(100)" json:"category"`
+	IconType    string `gorm:"type:varchar(50)" json:"icon_type"` // e.g. "Cpu", "TrendingUp"
+	Subscribers int    `gorm:"default:0" json:"subscribers"`
 }
