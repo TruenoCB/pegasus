@@ -21,6 +21,7 @@ func (s *SocialService) CreatePost(userID, content string) (*models.Post, error)
 		Title:       "User Post",
 		Description: content, // Preview of content
 		IsPublic:    true,
+		Data:        "{}",
 	}
 	if err := s.db.Create(&asset).Error; err != nil {
 		return nil, err

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { 
   Plus, Rss, Loader2, Compass, TrendingUp, 
-  Newspaper, Cpu, Globe, Share2, Bookmark, FolderPlus, Send, Settings
+  Newspaper, Cpu, Globe, Share2, Bookmark, FolderPlus, Send, Settings, X
 } from 'lucide-react';
 
 // 推荐的 RSS 源列表 (模拟社区推荐)
@@ -32,6 +32,7 @@ const Aurora: React.FC = () => {
     const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
     const [customUrls, setCustomUrls] = useState('');
     const [promptConfig, setPromptConfig] = useState('Please summarize the key points, extracting the most important insights and technical details. Format the output in Markdown.');
+    const [generateImmediately, setGenerateImmediately] = useState(true);
     const [creatingGroup, setCreatingGroup] = useState(false);
 
     useEffect(() => {
@@ -127,7 +128,10 @@ const Aurora: React.FC = () => {
         const customUrlList = customUrls.split('\n').map(u => u.trim()).filter(u => u);
         const allUrls = [...new Set([...selectedUrls, ...customUrlList])];
         
-        if (!groupName || allUrls.length === 0) return;
+        if (!groupName || allUrls.length === 0) {
+            alert('Please provide a group name and at least one RSS URL.');
+            return;
+        }
         
         setCreatingGroup(true);
         try {
@@ -161,6 +165,10 @@ const Aurora: React.FC = () => {
                 });
                 if (groupsRes.ok) {
                     setMyGroups(await groupsRes.json());
+                }
+
+                if (generateImmediately && data.id) {
+                    handleGenerateReport(data.id);
                 }
             } else {
                 alert(data.error || 'Failed to create group');
@@ -394,14 +402,33 @@ const Aurora: React.FC = () => {
                                         <div className="pt-2">
                                             <p className="text-sm text-gray-400 mb-2">Selected from Popular ({selectedUrls.length}):</p>
                                             <div className="flex flex-wrap gap-2">
-                                                {selectedUrls.length === 0 ? (
-                                                    <span className="text-xs text-gray-500">None selected</span>
+                                                {selectedUrls.length > 0 ? (
+                                                    selectedUrls.map(url => {
+                                                        const source = popularSources.find(s => s.url === url);
+                                                        return (
+                                                            <span key={url} className="px-3 py-1 bg-white/10 rounded-full text-xs flex items-center gap-2">
+                                                                {source?.name || url}
+                                                                <button onClick={() => toggleUrlSelection(url)} className="hover:text-red-400"><X className="w-3 h-3" /></button>
+                                                            </span>
+                                                        );
+                                                    })
                                                 ) : (
-                                                    popularSources.filter(f => selectedUrls.includes(f.url)).map(f => (
-                                                        <span key={f.name} className="text-xs px-2 py-1 bg-white/10 rounded-md">{f.name}</span>
-                                                    ))
+                                                    <span className="text-xs text-gray-500">None selected</span>
                                                 )}
                                             </div>
+                                        </div>
+
+                                        <div className="pt-4 flex items-center gap-3 border-t border-white/10">
+                                            <input 
+                                                type="checkbox" 
+                                                id="generateImmediately"
+                                                checked={generateImmediately}
+                                                onChange={(e) => setGenerateImmediately(e.target.checked)}
+                                                className="w-4 h-4 rounded border-white/20 bg-white/5 text-blue-500 focus:ring-blue-500 focus:ring-offset-black"
+                                            />
+                                            <label htmlFor="generateImmediately" className="text-sm text-white font-medium cursor-pointer">
+                                                Generate report immediately after creation
+                                            </label>
                                         </div>
                                     </div>
 
