@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  devbox:
+    # 直接使用官方 Go 镜像
+    image: golang:1.22-bookworm
+    container_name: pegasus-devbox
+    restart: unless-stopped
+    ports:
+      - "8080:80"   # NAS 访问入口 (Nginx)
+      - "8081:8080" # 后端 API 直连调试
+    volumes:
+      # 不再挂载本地代码，只创建一个持久化卷用于存放你在容器内拉取的代码
+      - /volume1/backup/codes/app:/app
+    working_dir: /app
+    
+    # 容器启动时只安装基础环境，然后无限挂起，等待你手动进入操作
+    command: >
+      bash -c "
+      if ! command -v node &> /dev/null; then
+        echo 'Initializing environment (Node.js & Nginx)...'
+        apt-get update -qq && apt-get install -y -qq curl vim nano net-tools nginx > /dev/null
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null
+        apt-get install -y -qq nodejs > /dev/null
+      fi;
+      echo 'Environment ready. Waiting for manual operations...';
+      tail -f /dev/null
+      "
+    
+    
+    # 移除硬编码的环境变量，全部通过 start_backend.sh 脚本注入
+    # environment:
+    #   - DATABASE_URL=...
+    
+    networks:
+      - pegasus-midware_pegasus-net
+
+volumes:
+  devbox_workspace:
+
+networks:
+  pegasus-midware_pegasus-net:
+    external: true

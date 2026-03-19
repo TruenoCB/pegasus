@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  pegasus-app:
+    image: pegasus-app:latest
+    container_name: pegasus-app
+    restart: always
+    ports:
+      - "8080:80" # 映射 NAS 端口 8080 到容器 80
+    environment:
+      # 数据库连接 - 请修改为你的中间件地址
+      # 如果中间件在同一个 Docker 网络，可以使用容器名
+      # 如果中间件在宿主机或其他地方，请使用真实 IP
+      - DATABASE_URL=pegasus:pegasus_password@tcp(192.168.1.100:3306)/pegasus?charset=utf8mb4&parseTime=True&loc=Local
+      - REDIS_URL=192.168.1.100:6379
+      - ELASTICSEARCH_URL=http://192.168.1.100:9200
+      
+      # 应用配置
+      - JWT_SECRET=your_production_secret_key
+      - PORT=8080 # 后端内部端口，保持默认即可
+      
+      # AI 配置
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - AI_BASE_URL=${AI_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_MODEL=${AI_MODEL:-gpt-3.5-turbo}
+
+      # SMTP 邮件配置 (选填)
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+
+    # 如果你的中间件在特定的 Docker 网络中，请取消注释并修改网络名称
+    # networks:
+    #   - your_middleware_network_name

@@ -5,6 +5,8 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Aurora from './pages/Aurora';
+import Social from './pages/Social';
+import Profile from './pages/Profile';
 
 function App() {
   return (
@@ -14,6 +16,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/aurora" element={<Aurora />} />
+        <Route path="/social" element={<Social />} />
+        <Route path="/profile" element={<Profile />} />
       </Routes>
     </Layout>
   );
