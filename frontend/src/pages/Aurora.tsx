@@ -4,6 +4,8 @@ import {
   Plus, Rss, Loader2, Compass, TrendingUp, 
   Newspaper, Cpu, Globe, Share2, Bookmark, FolderPlus, Send, Settings, X
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // 推荐的 RSS 源列表 (模拟社区推荐)
 // This will now be fetched from backend
@@ -644,16 +646,10 @@ const Aurora: React.FC = () => {
                                 </button>
                                 <h2 className="text-3xl font-black mb-2 pr-32">{selectedReport.title}</h2>
                                 <p className="text-gray-500 mb-8">{new Date(selectedReport.created_at).toLocaleString()}</p>
-                                <div className="prose prose-invert max-w-none">
-                                    {/* A simple markdown renderer logic. In real app, use react-markdown */}
-                                    {selectedReport.content.split('\n').map((line: string, i: number) => {
-                                        if (line.startsWith('# ')) return <h1 key={i} className="text-2xl font-bold mt-6 mb-4">{line.substring(2)}</h1>;
-                                        if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold mt-5 mb-3">{line.substring(3)}</h2>;
-                                        if (line.startsWith('### ')) return <h3 key={i} className="text-lg font-bold mt-4 mb-2">{line.substring(4)}</h3>;
-                                        if (line.startsWith('- ')) return <li key={i} className="ml-4 mb-1">{line.substring(2)}</li>;
-                                        if (line.trim() === '') return <br key={i} />;
-                                        return <p key={i} className="mb-4 text-gray-300 leading-relaxed">{line}</p>;
-                                    })}
+                                <div className="prose prose-invert prose-sm md:prose-base max-w-none prose-p:leading-relaxed prose-headings:font-bold prose-a:text-blue-400 hover:prose-a:text-blue-300">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {selectedReport.content}
+                                    </ReactMarkdown>
                                 </div>
                                 <div className="flex gap-4 mt-8 pt-8 border-t border-white/10">
                                     <button className="flex items-center gap-2 px-6 py-3 bg-white text-black rounded-xl font-bold hover:bg-gray-200 transition-colors">

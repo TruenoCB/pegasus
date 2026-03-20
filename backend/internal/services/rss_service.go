@@ -240,43 +240,77 @@ func (s *RSSService) GetUnsummarizedItems(groupID string, since time.Time) ([]mo
 }
 
 func (s *RSSService) GetPopularSources() ([]models.PopularSource, error) {
-	var sources []models.PopularSource
-	err := s.db.Find(&sources).Error
+	// Dynamically calculate popular sources from all user RSSGroups
+	var allGroups []models.RSSGroup
+	if err := s.db.Find(&allGroups).Error; err != nil {
+		return nil, err
+	}
 
-	if err == nil {
-		// Calculate real subscriber counts from RSSGroups
-		var allGroups []models.RSSGroup
-		if s.db.Find(&allGroups).Error == nil {
-			// Map to count how many times each URL is used
-			urlCounts := make(map[string]int)
-			for _, group := range allGroups {
-				var urls []string
-				if json.Unmarshal([]byte(group.FeedConfigs), &urls) == nil {
-					for _, url := range urls {
-						urlCounts[url]++
-					}
+	urlCounts := make(map[string]int)
+	urlNames := make(map[string]string)
+
+	for _, group := range allGroups {
+		var urls []string
+		if json.Unmarshal([]byte(group.FeedConfigs), &urls) == nil {
+			for _, url := range urls {
+				urlCounts[url]++
+				// Just use the group name as a fallback name for the source if not set
+				if urlNames[url] == "" {
+					urlNames[url] = group.Name + " Source"
 				}
 			}
-
-			// Update the sources with real counts + a base number so it doesn't look empty
-			for i := range sources {
-				realCount := urlCounts[sources[i].URL]
-				// Base popularity + real usage
-				sources[i].Subscribers = 1000 + (realCount * 42) // Multiplier for visual effect, base 1000
-			}
 		}
+	}
+
+	// Fetch preset sources to mix them in or use their metadata (like icons/real names)
+	var presetSources []models.PopularSource
+	s.db.Find(&presetSources)
+	presetMap := make(map[string]models.PopularSource)
+	for _, p := range presetSources {
+		presetMap[p.URL] = p
+	}
+
+	var finalSources []models.PopularSource
+	
+	// Add dynamically found sources
+	for url, count := range urlCounts {
+		if preset, exists := presetMap[url]; exists {
+			preset.Subscribers = 1000 + (count * 42) // Add weight to real subscriptions
+			finalSources = append(finalSources, preset)
+			delete(presetMap, url) // mark as processed
+		} else {
+			finalSources = append(finalSources, models.PopularSource{
+				ID:          uuid.New().String(),
+				Name:        urlNames[url],
+				URL:         url,
+				Category:    "Community",
+				IconType:    "Globe", // default icon
+				Subscribers: count * 42,
+			})
+		}
+	}
+
+	// Add remaining presets that no one subscribed to yet (so the page isn't empty initially)
+	for _, p := range presetMap {
+		p.Subscribers = 1000 // base value
+		finalSources = append(finalSources, p)
 	}
 
 	// Sort by subscribers descending
-	for i := 0; i < len(sources); i++ {
-		for j := i + 1; j < len(sources); j++ {
-			if sources[i].Subscribers < sources[j].Subscribers {
-				sources[i], sources[j] = sources[j], sources[i]
+	for i := 0; i < len(finalSources); i++ {
+		for j := i + 1; j < len(finalSources); j++ {
+			if finalSources[i].Subscribers < finalSources[j].Subscribers {
+				finalSources[i], finalSources[j] = finalSources[j], finalSources[i]
 			}
 		}
 	}
 
-	return sources, err
+	// Return top 10
+	if len(finalSources) > 10 {
+		finalSources = finalSources[:10]
+	}
+
+	return finalSources, nil
 }
 
 func (s *RSSService) SeedPopularSources() {

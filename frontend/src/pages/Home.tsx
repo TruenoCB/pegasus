@@ -48,7 +48,7 @@ const Home: React.FC = () => {
             <Link to="/aurora" className="group relative px-8 py-4 bg-white text-black rounded-2xl font-black text-lg tracking-widest uppercase overflow-hidden transition-all hover:scale-105 block">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-10 transition-opacity" />
               <span className="relative flex items-center gap-2">
-                Enter Aurora <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                Enter <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </span>
             </Link>
           ) : (

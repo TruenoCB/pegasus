@@ -113,33 +113,37 @@ const Profile: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
       {/* Profile Header */}
-      <div className="relative mb-12">
-        <div className="h-48 w-full bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-3xl border border-white/10" />
-        <div className="absolute -bottom-8 left-8 flex items-end gap-6">
-          <div className="w-32 h-32 bg-gray-900 border-4 border-black rounded-3xl flex items-center justify-center text-4xl font-bold shadow-2xl overflow-hidden">
-            {user?.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : (user?.name?.[0]?.toUpperCase() || 'U')}
-          </div>
-          <div className="mb-2">
-            <h1 className="text-4xl font-black tracking-tight">{user?.name || 'Anonymous User'}</h1>
-            <p className="text-gray-500 font-medium">@{user?.email?.split('@')[0] || 'username'}</p>
-          </div>
+      <div className="mb-12">
+        <div className="h-48 w-full bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-3xl border border-white/10 relative">
+          {/* Cover image area */}
         </div>
-        {isMe && (
-          <div className="absolute bottom-4 right-8 flex gap-3">
-            <button 
-              onClick={handleLogout}
-              className="px-6 py-2 bg-red-500/10 text-red-500 font-bold rounded-xl hover:bg-red-500/20 transition-colors flex items-center gap-2"
-            >
-              <LogOut className="w-4 h-4" /> Logout
-            </button>
-            <button 
-              onClick={handleEditProfile}
-              className="px-6 py-2 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center gap-2"
-            >
-              <Edit3 className="w-4 h-4" /> Edit Profile
-            </button>
+        <div className="px-4 sm:px-8 -mt-16 sm:-mt-20 relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-6">
+            <div className="w-32 h-32 bg-gray-900 border-4 border-black rounded-3xl flex items-center justify-center text-4xl font-bold shadow-2xl overflow-hidden shrink-0">
+              {user?.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : (user?.name?.[0]?.toUpperCase() || 'U')}
+            </div>
+            <div className="mb-2">
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight">{user?.name || 'Anonymous User'}</h1>
+              <p className="text-gray-500 font-medium">@{user?.email?.split('@')[0] || 'username'}</p>
+            </div>
           </div>
-        )}
+          {isMe && (
+            <div className="flex gap-3 pb-2">
+              <button 
+                onClick={handleLogout}
+                className="flex-1 sm:flex-none px-6 py-2 bg-red-500/10 text-red-500 font-bold rounded-xl hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2"
+              >
+                <LogOut className="w-4 h-4" /> Logout
+              </button>
+              <button 
+                onClick={handleEditProfile}
+                className="flex-1 sm:flex-none px-6 py-2 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <Edit3 className="w-4 h-4" /> Edit
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
