@@ -117,18 +117,18 @@ const Profile: React.FC = () => {
         <div className="h-48 w-full bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-3xl border border-white/10 relative">
           {/* Cover image area */}
         </div>
-        <div className="px-4 sm:px-8 -mt-16 sm:-mt-20 relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+        <div className="px-4 sm:px-8 -mt-16 sm:-mt-16 relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div className="flex flex-col sm:flex-row sm:items-end gap-6">
             <div className="w-32 h-32 bg-gray-900 border-4 border-black rounded-3xl flex items-center justify-center text-4xl font-bold shadow-2xl overflow-hidden shrink-0">
               {user?.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : (user?.name?.[0]?.toUpperCase() || 'U')}
             </div>
-            <div className="mb-2">
+            <div className="mb-2 sm:mb-4">
               <h1 className="text-3xl sm:text-4xl font-black tracking-tight">{user?.name || 'Anonymous User'}</h1>
               <p className="text-gray-500 font-medium">@{user?.email?.split('@')[0] || 'username'}</p>
             </div>
           </div>
           {isMe && (
-            <div className="flex gap-3 pb-2">
+            <div className="flex gap-3 sm:mb-4">
               <button 
                 onClick={handleLogout}
                 className="flex-1 sm:flex-none px-6 py-2 bg-red-500/10 text-red-500 font-bold rounded-xl hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2"

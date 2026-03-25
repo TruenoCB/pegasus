@@ -5,6 +5,7 @@ import {
   Newspaper, Cpu, Globe, Share2, Bookmark, FolderPlus, Send, Settings, X
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useNavigate } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
 
 // 推荐的 RSS 源列表 (模拟社区推荐)
@@ -13,6 +14,7 @@ import remarkGfm from 'remark-gfm';
 
 const Aurora: React.FC = () => {
     const { token } = useAuthStore();
+    const navigate = useNavigate();
     const [url, setUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const [summaries, setSummaries] = useState<any[]>([]);
@@ -42,6 +44,9 @@ const Aurora: React.FC = () => {
     const [promptConfig, setPromptConfig] = useState('Please summarize the key points, extracting the most important insights and technical details. Format the output in Markdown.');
     const [generateImmediately, setGenerateImmediately] = useState(true);
     const [creatingGroup, setCreatingGroup] = useState(false);
+    
+    // Support multiple frequencies: daily, weekly, monthly
+    const [frequencies, setFrequencies] = useState<string[]>(['daily']);
 
     useEffect(() => {
         const fetchPopularSources = async () => {
@@ -143,6 +148,7 @@ const Aurora: React.FC = () => {
         
         setCreatingGroup(true);
         try {
+            const frequencyStr = frequencies.join(','); // Send as comma separated string
             const res = await fetch('/api/rss/group', {
                 method: 'POST',
                 headers: { 
@@ -154,7 +160,8 @@ const Aurora: React.FC = () => {
                     description: `Group created with ${allUrls.length} feeds`,
                     urls: allUrls,
                     emails: groupEmails.split(',').map(e => e.trim()).filter(e => e),
-                    prompt_config: promptConfig
+                    prompt_config: promptConfig,
+                    frequency: frequencyStr
                 }),
             });
             const data = await res.json();
@@ -166,6 +173,7 @@ const Aurora: React.FC = () => {
                 setSelectedUrls([]);
                 setCustomUrls('');
                 setPromptConfig('Please summarize the key points, extracting the most important insights and technical details. Format the output in Markdown.');
+                setFrequencies(['daily']);
                 
                 // Refresh my groups
                 const groupsRes = await fetch('/api/rss/groups/me', {
@@ -290,7 +298,7 @@ const Aurora: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-black text-white">
+        <div className="min-h-screen text-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 
                 {/* Header Section */}
@@ -462,6 +470,32 @@ const Aurora: React.FC = () => {
                                                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 h-24 resize-none text-sm"
                                                 placeholder="e.g. Please summarize the key points in Chinese, extracting the most important insights..."
                                             />
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <p className="text-sm text-gray-400 mb-2">Report Frequency (Select multiple)</p>
+                                            <div className="flex gap-4">
+                                                {['daily', 'weekly', 'monthly'].map(freq => (
+                                                    <label key={freq} className="flex items-center gap-2 cursor-pointer">
+                                                        <input 
+                                                            type="checkbox"
+                                                            checked={frequencies.includes(freq)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setFrequencies([...frequencies, freq]);
+                                                                } else {
+                                                                    // ensure at least one is selected
+                                                                    if (frequencies.length > 1) {
+                                                                        setFrequencies(frequencies.filter(f => f !== freq));
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="w-4 h-4 accent-blue-500"
+                                                        />
+                                                        <span className="text-sm text-gray-300 capitalize">{freq}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
                                         </div>
 
                                         <div className="pt-2">
@@ -652,8 +686,37 @@ const Aurora: React.FC = () => {
                                     </ReactMarkdown>
                                 </div>
                                 <div className="flex gap-4 mt-8 pt-8 border-t border-white/10">
-                                    <button className="flex items-center gap-2 px-6 py-3 bg-white text-black rounded-xl font-bold hover:bg-gray-200 transition-colors">
-                                        <Share2 className="w-4 h-4" /> Share Asset
+                                    <button 
+                                        onClick={async () => {
+                                            // Share to Social by creating a post with this asset
+                                            const content = prompt("Enter your thoughts to share with this report:");
+                                            if (content === null) return;
+                                            
+                                            try {
+                                                const res = await fetch('/api/social/posts', {
+                                                    method: 'POST',
+                                                    headers: { 
+                                                        'Content-Type': 'application/json',
+                                                        'Authorization': `Bearer ${token}` 
+                                                    },
+                                                    body: JSON.stringify({ 
+                                                        content: content || `Check out this report: ${selectedReport.title}`,
+                                                        asset_id: selectedReport.asset_id 
+                                                    }),
+                                                });
+                                                if (res.ok) {
+                                                    alert('Shared to Social Feed!');
+                                                    navigate('/social');
+                                                } else {
+                                                    alert('Failed to share.');
+                                                }
+                                            } catch (e) {
+                                                console.error(e);
+                                            }
+                                        }}
+                                        className="flex items-center gap-2 px-6 py-3 bg-white text-black rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                                    >
+                                        <Share2 className="w-4 h-4" /> Share to Feed
                                     </button>
                                     <button className="flex items-center gap-2 px-6 py-3 bg-white/10 rounded-xl font-bold hover:bg-white/20 transition-colors">
                                         <Bookmark className="w-4 h-4" /> Save

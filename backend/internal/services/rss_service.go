@@ -25,7 +25,7 @@ func NewRSSService(db *gorm.DB) *RSSService {
 	}
 }
 
-func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, emails []string, promptConfig string) (*models.RSSGroup, error) {
+func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, emails []string, promptConfig string, frequency string) (*models.RSSGroup, error) {
 	urlsJson, _ := json.Marshal(urls)
 	emailsJson, _ := json.Marshal(emails)
 
@@ -42,6 +42,10 @@ func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, email
 		return nil, err
 	}
 
+	if frequency == "" {
+		frequency = "daily" // default to daily instead of weekly
+	}
+
 	group := models.RSSGroup{
 		ID:                 uuid.New().String(),
 		AssetID:            asset.ID,
@@ -50,6 +54,7 @@ func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, email
 		FeedConfigs:        string(urlsJson),
 		NotificationEmails: string(emailsJson),
 		PromptConfig:       promptConfig,
+		ReportFrequency:    frequency,
 	}
 	if err := s.db.Create(&group).Error; err != nil {
 		return nil, err
@@ -271,7 +276,7 @@ func (s *RSSService) GetPopularSources() ([]models.PopularSource, error) {
 	}
 
 	var finalSources []models.PopularSource
-	
+
 	// Add dynamically found sources
 	for url, count := range urlCounts {
 		if preset, exists := presetMap[url]; exists {

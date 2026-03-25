@@ -17,7 +17,9 @@ func NewSocialHandler(socialService *services.SocialService) *SocialHandler {
 }
 
 type CreatePostRequest struct {
-	Content string `json:"content" binding:"required"`
+	Content     string  `json:"content" binding:"required"`
+	AssetID     *string `json:"asset_id,omitempty"`
+	QuotePostID *string `json:"quote_post_id,omitempty"`
 }
 
 func (h *SocialHandler) CreatePost(c *gin.Context) {
@@ -29,7 +31,7 @@ func (h *SocialHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.socialService.CreatePost(userID, req.Content)
+	post, err := h.socialService.CreatePost(userID, req.Content, req.AssetID, req.QuotePostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -160,7 +162,14 @@ func (h *SocialHandler) GetMessages(c *gin.Context) {
 
 func (h *SocialHandler) GetUsers(c *gin.Context) {
 	query := c.Query("q")
-	users, err := h.socialService.GetUsers(query)
+	mutualOnly := c.Query("mutual") == "true"
+	
+	mutualWithUserID := ""
+	if mutualOnly {
+		mutualWithUserID = c.GetString("user_id")
+	}
+
+	users, err := h.socialService.GetUsers(query, mutualWithUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

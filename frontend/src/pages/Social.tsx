@@ -16,6 +16,7 @@ const Social: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [commentingOn, setCommentingOn] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
+  const [quotePost, setQuotePost] = useState<any | null>(null);
 
   const fetchPosts = async () => {
     try {
@@ -103,16 +104,21 @@ const Social: React.FC = () => {
     if (!newPostContent.trim()) return;
     setLoading(true);
     try {
+      const body: any = { content: newPostContent };
+      if (quotePost) {
+        body.quote_post_id = quotePost.id;
+      }
       const res = await fetch('/api/social/posts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ content: newPostContent })
+        body: JSON.stringify(body)
       });
       if (res.ok) {
         setNewPostContent('');
+        setQuotePost(null);
         fetchPosts();
         fetchStats();
       }
@@ -219,26 +225,46 @@ const Social: React.FC = () => {
 
       {/* Main Feed */}
       <main className="flex-1 space-y-6">
-        {/* Search & Post Input */}
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-4 flex gap-4 items-center">
-          <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center">
-            <User className="w-5 h-5 text-gray-400" />
+        {/* Redesigned Post Input */}
+        <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col gap-4 relative">
+          <div className="flex gap-4">
+            <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
+              {user?.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : <User className="w-5 h-5 text-gray-400" />}
+            </div>
+            <textarea 
+              value={newPostContent}
+              onChange={(e) => setNewPostContent(e.target.value)}
+              placeholder={quotePost ? "Add a comment..." : "What's happening? Share a long article or an insight..."} 
+              className="flex-1 bg-transparent border-none focus:outline-none text-gray-100 resize-none min-h-[80px]"
+              rows={3}
+            />
           </div>
-          <input 
-            type="text" 
-            value={newPostContent}
-            onChange={(e) => setNewPostContent(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handlePost()}
-            placeholder="Share an insight or asset..." 
-            className="flex-1 bg-transparent border-none focus:outline-none text-gray-300"
-          />
-          <button 
-            onClick={handlePost}
-            disabled={loading || !newPostContent.trim()}
-            className="px-4 py-2 bg-white text-black text-sm font-bold rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Posting...' : 'Post'}
-          </button>
+
+          {quotePost && (
+            <div className="ml-14 mt-2 p-4 border border-white/10 rounded-2xl bg-black/20 relative">
+              <button 
+                onClick={() => setQuotePost(null)}
+                className="absolute top-2 right-2 text-gray-500 hover:text-white"
+              >
+                ✕
+              </button>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="font-bold text-sm">{quotePost.user?.name || 'Anonymous'}</span>
+                <span className="text-xs text-gray-500">@{quotePost.user?.email?.split('@')[0]}</span>
+              </div>
+              <div className="text-sm text-gray-300 line-clamp-3 whitespace-pre-wrap">{quotePost.content}</div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-2 border-t border-white/10 mt-2">
+            <button 
+              onClick={handlePost}
+              disabled={loading || !newPostContent.trim()}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-full transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Posting...' : 'Post'}
+            </button>
+          </div>
         </div>
 
         {/* Feed Posts */}
@@ -252,14 +278,14 @@ const Social: React.FC = () => {
               <article key={post.id} className="bg-white/5 border border-white/10 rounded-3xl p-6 hover:bg-white/[0.07] transition-all group">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex gap-3">
-                    <div className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center font-bold text-blue-400 border border-white/5 uppercase">
-                      {post.user?.name?.substring(0, 2) || 'AN'}
+                    <div className="w-12 h-12 bg-gray-800 rounded-2xl flex items-center justify-center font-bold text-blue-400 border border-white/5 uppercase overflow-hidden shrink-0">
+                      {post.user?.avatar_url ? <img src={post.user.avatar_url} className="w-full h-full object-cover" /> : (post.user?.name?.substring(0, 2) || 'AN')}
                     </div>
                     <div>
                       <h4 className="font-bold flex items-center gap-2">
                         {post.user?.name || 'Anonymous'}
                       </h4>
-                      <p className="text-xs text-gray-500">{new Date(post.created_at).toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">@{post.user?.email?.split('@')[0]} • {new Date(post.created_at).toLocaleString()}</p>
                     </div>
                   </div>
                   <button className="text-gray-500 hover:text-white">
@@ -267,9 +293,39 @@ const Social: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="mb-4 text-gray-300 leading-relaxed whitespace-pre-wrap">
+                <div className="mb-4 text-gray-100 leading-relaxed whitespace-pre-wrap">
                   {post.content}
                 </div>
+
+                {/* Quoted Post Rendering */}
+                {post.quoted_post && (
+                  <div className="mb-4 p-4 border border-white/10 rounded-2xl bg-black/20 hover:bg-black/30 transition-colors cursor-pointer" onClick={() => setQuotePost(post.quoted_post)}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-5 h-5 bg-gray-700 rounded-full flex items-center justify-center text-[8px] font-bold uppercase overflow-hidden">
+                        {post.quoted_post.user?.avatar_url ? <img src={post.quoted_post.user.avatar_url} className="w-full h-full object-cover" /> : post.quoted_post.user?.name?.substring(0, 1)}
+                      </div>
+                      <span className="font-bold text-sm">{post.quoted_post.user?.name || 'Anonymous'}</span>
+                      <span className="text-xs text-gray-500">@{post.quoted_post.user?.email?.split('@')[0]}</span>
+                    </div>
+                    <div className="text-sm text-gray-300 line-clamp-4 whitespace-pre-wrap">{post.quoted_post.content}</div>
+                  </div>
+                )}
+
+                {/* Shared Asset Rendering */}
+                {post.asset && (
+                  <div className="mb-4 p-4 border border-blue-500/20 bg-blue-500/5 rounded-2xl flex items-start gap-4">
+                    <div className="p-3 bg-blue-500/10 rounded-xl">
+                      <Zap className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <div>
+                      <h5 className="font-bold text-blue-400 mb-1">{post.asset.title}</h5>
+                      <p className="text-sm text-gray-400 line-clamp-2">{post.asset.description}</p>
+                      <div className="mt-2 text-[10px] uppercase tracking-widest text-gray-500 font-bold border border-white/10 inline-block px-2 py-1 rounded">
+                        {post.asset.type.replace('_', ' ')}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-6 border-t border-white/5 pt-4">
                   <button 
@@ -286,7 +342,13 @@ const Social: React.FC = () => {
                     <MessageCircle className="w-4 h-4" />
                     <span className="text-xs font-medium">{post.comments?.length || 0}</span>
                   </button>
-                  <button className="flex items-center gap-2 text-gray-500 hover:text-green-400 transition-colors ml-auto">
+                  <button 
+                    onClick={() => {
+                      setQuotePost(post);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-2 text-gray-500 hover:text-green-400 transition-colors ml-auto"
+                  >
                     <Share2 className="w-4 h-4" />
                   </button>
                 </div>

@@ -50,16 +50,51 @@ func (s *ReportService) GenerateReport(groupID string, reportType string) (*mode
 	}
 	var urls []string
 	json.Unmarshal([]byte(group.FeedConfigs), &urls)
-	
+
 	for _, url := range urls {
 		// Ignore errors here to not fail entire report if one feed fails
 		_ = s.rssService.FetchAndSave(url)
 	}
 
 	// 3. Get Items
-	items, emails, err := s.rssService.GetUnsummarizedItems(groupID, since)
-	if err != nil {
-		return nil, err
+	// Since daily, weekly, monthly are distinct scheduled runs,
+	// we will always fetch the last 24h/7d/30d of content from the database.
+	// We want to fetch items that fall within `since`, whether they were previously summarized or not, 
+	// to build a comprehensive weekly/monthly report.
+	// For 'daily', we use GetUnsummarizedItems to avoid repeating same news in the same day.
+	// For 'weekly'/'monthly', we can fetch all items in that period to create an overarching summary.
+	
+	var items []models.AISummary
+	var emails []string
+	
+	if group.NotificationEmails != "" {
+		json.Unmarshal([]byte(group.NotificationEmails), &emails)
+	}
+
+	if reportType == "daily" {
+		var fetchErr error
+		items, emails, fetchErr = s.rssService.GetUnsummarizedItems(groupID, since)
+		if fetchErr != nil {
+			return nil, fetchErr
+		}
+	} else {
+		// For weekly/monthly, fetch reports that were generated within the time window
+		var oldReports []models.Report
+		if err := s.db.Where("rss_group_id = ? AND type = 'daily' AND generated_at >= ?", groupID, since).Order("generated_at desc").Find(&oldReports).Error; err != nil {
+			return nil, err
+		}
+
+		if len(oldReports) == 0 {
+			return nil, fmt.Errorf("no daily reports found for %s summary", reportType)
+		}
+
+		// Convert old reports into mock items for summarization
+		for _, r := range oldReports {
+			items = append(items, models.AISummary{
+				OriginalTitle:   fmt.Sprintf("Daily Report (%s)", r.GeneratedAt.Format("2006-01-02")),
+				OriginalContent: r.Content,
+			})
+		}
 	}
 
 	if len(items) == 0 {
@@ -79,7 +114,7 @@ func (s *ReportService) GenerateReport(groupID string, reportType string) (*mode
 	if len(fullContent) > 10000 {
 		fullContent = fullContent[:10000] + "...(truncated)"
 	}
-	
+
 	summary, err := s.aiService.Summarize(fullContent, "zh") // Default to Chinese
 	if err != nil {
 		return nil, err
@@ -102,7 +137,7 @@ func (s *ReportService) GenerateReport(groupID string, reportType string) (*mode
 	subject := fmt.Sprintf("[%s Report] %s", strings.Title(reportType), group.Name)
 	// Convert Markdown summary to HTML (simple replace for now, or just send as pre)
 	htmlBody := fmt.Sprintf("<h2>%s</h2><pre style='white-space: pre-wrap;'>%s</pre>", subject, summary)
-	
+
 	go s.notificationService.SendEmail(emails, subject, htmlBody)
 
 	return &report, nil

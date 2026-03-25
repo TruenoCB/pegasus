@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 	"pegasus/internal/services"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -41,15 +41,15 @@ func (h *RSSHandler) Process(c *gin.Context) {
 	var summaries []map[string]interface{}
 	for _, item := range items {
 		summaries = append(summaries, map[string]interface{}{
-			"title": item.OriginalTitle,
-			"link":  req.URL, // Using feed URL as fallback since link isn't in AISummary yet
-			"summary": item.OriginalContent, // Fallback to content if no AI summary yet
+			"title":     item.OriginalTitle,
+			"link":      req.URL,                                   // Using feed URL as fallback since link isn't in AISummary yet
+			"summary":   item.OriginalContent,                      // Fallback to content if no AI summary yet
 			"keyPoints": []string{"Point 1", "Point 2", "Point 3"}, // Dummy points
 		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"feed": feed,
+		"feed":      feed,
 		"summaries": summaries,
 	})
 }
@@ -80,6 +80,7 @@ type CreateGroupRequest struct {
 	URLs         []string `json:"urls" binding:"required"`
 	Emails       []string `json:"emails"`
 	PromptConfig string   `json:"prompt_config"`
+	Frequency    string   `json:"frequency"` // "daily", "weekly", "monthly"
 }
 
 func (h *RSSHandler) GetPopularSources(c *gin.Context) {
@@ -104,7 +105,7 @@ func (h *RSSHandler) CreateGroup(c *gin.Context) {
 		return
 	}
 
-	group, err := h.rssService.CreateGroup(userID, req.Name, req.Description, req.URLs, req.Emails, req.PromptConfig)
+	group, err := h.rssService.CreateGroup(userID, req.Name, req.Description, req.URLs, req.Emails, req.PromptConfig, req.Frequency)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

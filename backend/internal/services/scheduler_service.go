@@ -60,7 +60,8 @@ func (s *SchedulerService) generateReports(frequency string) {
 	log.Printf("🔄 Starting scheduled task: generating %s reports...", frequency)
 	
 	var groups []models.RSSGroup
-	if err := s.db.Where("report_frequency = ?", frequency).Find(&groups).Error; err != nil {
+	// LIKE is used because report_frequency is a comma-separated string now (e.g. "daily,weekly")
+	if err := s.db.Where("report_frequency LIKE ?", "%"+frequency+"%").Find(&groups).Error; err != nil {
 		log.Printf("❌ Failed to fetch groups for %s reports: %v", frequency, err)
 		return
 	}

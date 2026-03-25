@@ -14,7 +14,7 @@ const Chat: React.FC = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await fetch('/api/chat/users', {
+        const res = await fetch('/api/chat/users?mutual=true', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {

@@ -10,6 +10,7 @@ import (
 	"pegasus/internal/repository"
 	"pegasus/internal/services"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -25,6 +26,11 @@ func main() {
 	if err != nil {
 		log.Printf("Failed to connect to database (might be starting up): %v", err)
 	} else {
+		sqlDB, _ := db.DB()
+		sqlDB.SetConnMaxLifetime(time.Minute * 3)
+		sqlDB.SetMaxOpenConns(10)
+		sqlDB.SetMaxIdleConns(10)
+
 		// Auto Migrate
 		db.AutoMigrate(
 			&models.User{},

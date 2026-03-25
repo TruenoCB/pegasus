@@ -15,26 +15,16 @@ func NewSocialService(db *gorm.DB) *SocialService {
 	return &SocialService{db: db}
 }
 
-func (s *SocialService) CreatePost(userID, content string) (*models.Post, error) {
-	// First, explicitly create an Asset for this post
-	asset := models.Asset{
-		ID:          uuid.New().String(),
-		UserID:      userID,
-		Type:        "POST",
-		Title:       "User Post",
-		Description: content, // Preview of content
-		IsPublic:    true,
-		Data:        "{}",
-	}
-	if err := s.db.Create(&asset).Error; err != nil {
-		return nil, err
-	}
+func (s *SocialService) CreatePost(userID, content string, assetID *string, quotePostID *string) (*models.Post, error) {
+	// Optional: we can still implicitly create an asset for pure text posts,
+	// but let's just make the post directly. If they attach an asset, we link it.
 
 	post := &models.Post{
-		ID:      uuid.New().String(),
-		UserID:  userID,
-		Content: content,
-		AssetID: &asset.ID,
+		ID:          uuid.New().String(),
+		UserID:      userID,
+		Content:     content,
+		AssetID:     assetID,
+		QuotePostID: quotePostID,
 	}
 	if err := s.db.Create(post).Error; err != nil {
 		return nil, err
@@ -44,7 +34,15 @@ func (s *SocialService) CreatePost(userID, content string) (*models.Post, error)
 
 func (s *SocialService) GetPosts(limit, offset int) ([]models.Post, error) {
 	var posts []models.Post
-	err := s.db.Preload("User").Preload("Likes").Preload("Comments").Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+	err := s.db.Preload("User").
+		Preload("Likes").
+		Preload("Comments").
+		Preload("Comments.User").
+		Preload("Asset").
+		Preload("QuotedPost").
+		Preload("QuotedPost.User").
+		Preload("QuotedPost.Asset").
+		Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
 	return posts, err
 }
 
@@ -144,9 +142,16 @@ func (s *SocialService) GetMessages(user1, user2 string, limit, offset int) ([]m
 	return messages, err
 }
 
-func (s *SocialService) GetUsers(query string) ([]models.User, error) {
+func (s *SocialService) GetUsers(query string, mutualWithUserID string) ([]models.User, error) {
 	var users []models.User
 	dbQuery := s.db.Select("id", "name", "email", "avatar_url")
+
+	if mutualWithUserID != "" {
+		// Only mutual followers
+		dbQuery = dbQuery.Joins("JOIN social_relations r1 ON users.id = r1.following_id AND r1.follower_id = ? AND r1.type = 'follow'", mutualWithUserID).
+			Joins("JOIN social_relations r2 ON users.id = r2.follower_id AND r2.following_id = ? AND r2.type = 'follow'", mutualWithUserID)
+	}
+
 	if query != "" {
 		dbQuery = dbQuery.Where("name LIKE ? OR email LIKE ?", "%"+query+"%", "%"+query+"%")
 	}

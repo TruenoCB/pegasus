@@ -39,6 +39,7 @@ type RSSGroup struct {
 	FeedConfigs        string    `gorm:"type:text" json:"feed_configs"`        // JSON array of feed URLs
 	NotificationEmails string    `gorm:"type:text" json:"notification_emails"` // JSON array of emails
 	PromptConfig       string    `gorm:"type:text" json:"prompt_config"`       // Custom prompt for AI summarization
+	ReportFrequency    string    `gorm:"type:varchar(255);default:'daily'" json:"report_frequency"` // Comma-separated: "daily,weekly,monthly"
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
@@ -91,15 +92,18 @@ type SocialRelation struct {
 }
 
 type Post struct {
-	ID        string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
-	AssetID   *string   `gorm:"type:varchar(36);index;unique" json:"asset_id,omitempty"` // Links to Asset table, 1-to-1 (Optional for legacy posts)
-	UserID    string    `gorm:"type:varchar(36);not null;index" json:"user_id"`
-	User      User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Content   string    `gorm:"type:text;not null" json:"content"`
-	Likes     []Like    `gorm:"foreignKey:PostID" json:"likes,omitempty"`
-	Comments  []Comment `gorm:"foreignKey:PostID" json:"comments,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	AssetID     *string   `gorm:"type:varchar(36);index" json:"asset_id,omitempty"`      // Links to Asset table
+	QuotePostID *string   `gorm:"type:varchar(36);index" json:"quote_post_id,omitempty"` // For nested quotes
+	UserID      string    `gorm:"type:varchar(36);not null;index" json:"user_id"`
+	User        User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Content     string    `gorm:"type:text;not null" json:"content"`
+	Likes       []Like    `gorm:"foreignKey:PostID" json:"likes,omitempty"`
+	Comments    []Comment `gorm:"foreignKey:PostID" json:"comments,omitempty"`
+	Asset       *Asset    `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
+	QuotedPost  *Post     `gorm:"foreignKey:QuotePostID" json:"quoted_post,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type Like struct {
