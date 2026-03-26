@@ -38,6 +38,7 @@ const Aurora: React.FC = () => {
     const [editGroupEmails, setEditGroupEmails] = useState('');
     const [editGroupPrompt, setEditGroupPrompt] = useState('');
     const [editGroupEmailPrompt, setEditGroupEmailPrompt] = useState('');
+    const [editFrequencies, setEditFrequencies] = useState<string[]>(['daily']);
     const [savingGroup, setSavingGroup] = useState(false);
     const [groupName, setGroupName] = useState('');
     const [groupEmails, setGroupEmails] = useState('');
@@ -271,8 +272,10 @@ const Aurora: React.FC = () => {
                 body: JSON.stringify({ 
                     name: editGroupName,
                     urls: urls,
+                    emails: editGroupEmails.split(',').map(e => e.trim()).filter(e => e),
                     prompt_config: editGroupPrompt,
-                    email_prompt_config: editGroupEmailPrompt
+                    email_prompt_config: editGroupEmailPrompt,
+                    frequency: editFrequencies.join(',')
                 }),
             });
             if (res.ok) {
@@ -679,6 +682,41 @@ const Aurora: React.FC = () => {
                                                 onChange={e => setEditGroupPrompt(e.target.value)}
                                                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 h-24 resize-none text-sm"
                                             />
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Email Custom Prompt (Optional)</label>
+                                            <textarea 
+                                                value={editGroupEmailPrompt}
+                                                onChange={e => setEditGroupEmailPrompt(e.target.value)}
+                                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 h-24 resize-none text-sm"
+                                                placeholder="e.g. Please add a signature: - PEGASUS System"
+                                            />
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <p className="text-sm text-gray-400 mb-2">Report Frequency (Select multiple)</p>
+                                            <div className="flex gap-4">
+                                                {['daily', 'weekly', 'monthly'].map(freq => (
+                                                    <label key={`edit-${freq}`} className="flex items-center gap-2 cursor-pointer">
+                                                        <input 
+                                                            type="checkbox"
+                                                            checked={editFrequencies.includes(freq)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setEditFrequencies([...editFrequencies, freq]);
+                                                                } else {
+                                                                    if (editFrequencies.length > 1) {
+                                                                        setEditFrequencies(editFrequencies.filter(f => f !== freq));
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="w-4 h-4 accent-blue-500"
+                                                        />
+                                                        <span className="text-sm text-gray-300 capitalize">{freq}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
 

@@ -81,7 +81,7 @@ func (s *RSSService) GetUserGroups(userID string) ([]models.RSSGroup, error) {
 	return groups, err
 }
 
-func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, emails []string, promptConfig string, emailPromptConfig string) error {
+func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, emails []string, promptConfig string, emailPromptConfig string, frequency string) error {
 	var group models.RSSGroup
 
 	// First check if the group exists and belongs to the user
@@ -101,12 +101,17 @@ func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, em
 		"title": name,
 	})
 
+	if frequency == "" {
+		frequency = "daily"
+	}
+
 	return s.db.Model(&group).Updates(map[string]interface{}{
 		"name":                name,
 		"feed_configs":        string(urlsJson),
 		"notification_emails": string(emailsJson),
 		"prompt_config":       promptConfig,
 		"email_prompt_config": emailPromptConfig,
+		"report_frequency":    frequency,
 	}).Error
 }
 

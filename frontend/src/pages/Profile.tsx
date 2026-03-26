@@ -23,6 +23,8 @@ const Profile: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [popularAssets, setPopularAssets] = useState<any[]>([]);
 
+  const [followingUsers, setFollowingUsers] = useState<any[]>([]);
+
   useEffect(() => {
     const fetchData = async () => {
       if (!token || !targetUserId) return;
@@ -64,9 +66,18 @@ const Profile: React.FC = () => {
         if (assetsRes.ok) {
           const allAssets = await assetsRes.json();
           setAssets(allAssets);
-          // For badges, we'll just mock popular assets from their actual assets for now
-          // In a real app, you'd sort by a real 'subscribers' or 'views' count on the asset
           setPopularAssets(allAssets.slice(0, 3));
+        }
+
+        // Fetch following users list to manage followings
+        if (isMe) {
+          const usersRes = await fetch('/api/social/users', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (usersRes.ok) {
+            const allUsers = await usersRes.json();
+            setFollowingUsers(allUsers.filter((u: any) => u.is_following));
+          }
         }
       } catch (error) {
         console.error("Failed to fetch profile data", error);
@@ -74,6 +85,21 @@ const Profile: React.FC = () => {
     };
     fetchData();
   }, [token, targetUserId, isMe]);
+
+  const handleUnfollow = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/social/follow/${userId}`, {
+        method: 'POST', // Toggle follow will unfollow if already following
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setFollowingUsers(prev => prev.filter(u => u.id !== userId));
+        setStats(prev => ({ ...prev, following: prev.following - 1 }));
+      }
+    } catch (error) {
+      console.error("Failed to unfollow", error);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -175,6 +201,37 @@ const Profile: React.FC = () => {
                   <span className="text-blue-400 hover:underline cursor-pointer">pegasus.io/u/{user?.name?.toLowerCase().replace(/\s+/g, '')}</span>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
+            <h3 className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-500">Following</h3>
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+              {followingUsers.length > 0 ? (
+                followingUsers.map(u => (
+                  <div key={u.id} className="flex items-center justify-between group">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden shrink-0">
+                        {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : u.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold truncate max-w-[100px]">{u.name}</span>
+                        <span className="text-[10px] text-gray-500 truncate max-w-[100px]">@{u.email.split('@')[0]}</span>
+                      </div>
+                    </div>
+                    {isMe && (
+                      <button 
+                        onClick={() => handleUnfollow(u.id)}
+                        className="text-[10px] px-2 py-1 border border-white/20 rounded-full text-gray-400 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:border-red-400 transition-all"
+                      >
+                        Unfollow
+                      </button>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <span className="text-sm text-gray-500">Not following anyone yet</span>
+              )}
             </div>
           </div>
 

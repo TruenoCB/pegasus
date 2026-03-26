@@ -151,6 +151,7 @@ type UpdateGroupRequest struct {
 	Emails            []string `json:"emails"`
 	PromptConfig      string   `json:"prompt_config"`
 	EmailPromptConfig string   `json:"email_prompt_config"`
+	Frequency         string   `json:"frequency"` // "daily", "weekly", "monthly"
 }
 
 func (h *RSSHandler) UpdateGroup(c *gin.Context) {
@@ -163,7 +164,7 @@ func (h *RSSHandler) UpdateGroup(c *gin.Context) {
 		return
 	}
 
-	err := h.rssService.UpdateGroup(userID, groupID, req.Name, req.URLs, req.Emails, req.PromptConfig, req.EmailPromptConfig)
+	err := h.rssService.UpdateGroup(userID, groupID, req.Name, req.URLs, req.Emails, req.PromptConfig, req.EmailPromptConfig, req.Frequency)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
