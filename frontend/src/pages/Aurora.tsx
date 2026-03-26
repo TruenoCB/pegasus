@@ -254,7 +254,7 @@ const Aurora: React.FC = () => {
         setEditGroupPrompt(group.prompt_config || '');
         setEditGroupEmailPrompt(group.email_prompt_config || '');
         try {
-            const freqs = group.frequency ? group.frequency.split(',').filter(Boolean) : [];
+            const freqs = group.report_frequency ? group.report_frequency.split(',').filter(Boolean) : [];
             setEditFrequencies(freqs.length > 0 ? freqs : ['daily']);
             setEditSendEmailToggle(freqs.length > 0);
         } catch {
