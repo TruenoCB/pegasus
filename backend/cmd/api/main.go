@@ -110,6 +110,7 @@ func main() {
 		protected.Use(AuthMiddleware(cfg.JWTSecret))
 		{
 			protected.GET("/auth/me", authHandler.Me)
+			protected.PUT("/auth/me", authHandler.UpdateMe)
 
 			protected.POST("/ai/summarize", aiHandler.Summarize)
 
@@ -129,8 +130,9 @@ func main() {
 			protected.GET("/social/posts", socialHandler.GetPosts)
 			protected.POST("/social/posts/:id/like", socialHandler.LikePost)
 			protected.POST("/social/posts/:id/comment", socialHandler.CommentPost)
+			protected.GET("/social/users", socialHandler.GetUsers)
 			protected.GET("/social/users/:id", socialHandler.GetUser)
-			protected.POST("/social/users/:id/follow", socialHandler.ToggleFollow)
+			protected.POST("/social/follow/:id", socialHandler.ToggleFollow)
 			protected.GET("/social/users/:id/stats", socialHandler.GetProfileStats)
 			protected.GET("/social/users/me/assets", socialHandler.GetUserAssets)
 
