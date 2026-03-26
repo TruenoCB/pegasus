@@ -36,12 +36,14 @@ const Aurora: React.FC = () => {
     const [editGroupName, setEditGroupName] = useState('');
     const [editGroupUrls, setEditGroupUrls] = useState('');
     const [editGroupPrompt, setEditGroupPrompt] = useState('');
+    const [editGroupEmailPrompt, setEditGroupEmailPrompt] = useState('');
     const [savingGroup, setSavingGroup] = useState(false);
     const [groupName, setGroupName] = useState('');
     const [groupEmails, setGroupEmails] = useState('');
     const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
     const [customUrls, setCustomUrls] = useState('');
     const [promptConfig, setPromptConfig] = useState('Please summarize the key points, extracting the most important insights and technical details. Format the output in Markdown.');
+    const [emailPromptConfig, setEmailPromptConfig] = useState('');
     const [generateImmediately, setGenerateImmediately] = useState(true);
     const [creatingGroup, setCreatingGroup] = useState(false);
     
@@ -161,6 +163,7 @@ const Aurora: React.FC = () => {
                     urls: allUrls,
                     emails: groupEmails.split(',').map(e => e.trim()).filter(e => e),
                     prompt_config: promptConfig,
+                    email_prompt_config: emailPromptConfig,
                     frequency: frequencyStr
                 }),
             });
@@ -173,6 +176,7 @@ const Aurora: React.FC = () => {
                 setSelectedUrls([]);
                 setCustomUrls('');
                 setPromptConfig('Please summarize the key points, extracting the most important insights and technical details. Format the output in Markdown.');
+                setEmailPromptConfig('');
                 setFrequencies(['daily']);
                 
                 // Refresh my groups
@@ -197,7 +201,7 @@ const Aurora: React.FC = () => {
         }
     };
 
-    const handleGenerateReport = async (groupId: string) => {
+    const handleGenerateReport = async (groupId: string, sendEmail: boolean = false) => {
         setGeneratingReportFor(groupId);
         try {
             const res = await fetch('/api/rss/groups/report', {
@@ -206,7 +210,10 @@ const Aurora: React.FC = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}` 
                 },
-                body: JSON.stringify({ group_id: groupId }),
+                body: JSON.stringify({ 
+                    group_id: groupId,
+                    send_email: sendEmail
+                }),
             });
             if (res.ok) {
                 alert('Report generation started in the background. Please check the AI Summaries tab in a few moments.');
@@ -235,6 +242,7 @@ const Aurora: React.FC = () => {
             setEditGroupUrls('');
         }
         setEditGroupPrompt(group.prompt_config || '');
+        setEditGroupEmailPrompt(group.email_prompt_config || '');
     };
 
     const handleSaveGroup = async () => {
@@ -256,7 +264,8 @@ const Aurora: React.FC = () => {
                 body: JSON.stringify({ 
                     name: editGroupName,
                     urls: urls,
-                    prompt_config: editGroupPrompt
+                    prompt_config: editGroupPrompt,
+                    email_prompt_config: editGroupEmailPrompt
                 }),
             });
             if (res.ok) {
@@ -464,6 +473,16 @@ const Aurora: React.FC = () => {
                                         </div>
 
                                         <div className="pt-2">
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Email Custom Prompt (Optional)</label>
+                                            <textarea 
+                                                value={emailPromptConfig}
+                                                onChange={e => setEmailPromptConfig(e.target.value)}
+                                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 h-24 resize-none text-sm"
+                                                placeholder="e.g. Please add a signature: - PEGASUS System"
+                                            />
+                                        </div>
+
+                                        <div className="pt-2">
                                             <p className="text-sm text-gray-400 mb-2">Report Frequency (Select multiple)</p>
                                             <div className="flex gap-4">
                                                 {['daily', 'weekly', 'monthly'].map(freq => (
@@ -584,11 +603,18 @@ const Aurora: React.FC = () => {
                                         </div>
                                         <div className="flex gap-2">
                                             <button 
-                                                onClick={() => handleGenerateReport(group.id)}
+                                                onClick={() => handleGenerateReport(group.id, false)}
                                                 disabled={generatingReportFor === group.id}
                                                 className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
                                             >
                                                 {generatingReportFor === group.id ? 'Generating...' : 'Generate AI Report'}
+                                            </button>
+                                            <button 
+                                                onClick={() => handleGenerateReport(group.id, true)}
+                                                disabled={generatingReportFor === group.id}
+                                                className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                                            >
+                                                {generatingReportFor === group.id ? 'Generating...' : 'Generate & Send Email'}
                                             </button>
                                             <button 
                                                 onClick={() => handleEditGroup(group)}

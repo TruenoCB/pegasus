@@ -10,13 +10,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewRSSHandler(rss *services.RSSService, ai *services.AIService) *RSSHandler {
-	return &RSSHandler{rssService: rss, aiService: ai}
+func NewRSSHandler(rss *services.RSSService, ai *services.AIService, notificationService *services.NotificationService) *RSSHandler {
+	return &RSSHandler{
+		rssService:          rss,
+		aiService:           ai,
+		notificationService: notificationService,
+	}
 }
 
 type RSSHandler struct {
-	rssService *services.RSSService
-	aiService  *services.AIService
+	rssService          *services.RSSService
+	aiService           *services.AIService
+	notificationService *services.NotificationService
 }
 
 type ProcessRequest struct {
@@ -75,12 +80,13 @@ func (h *RSSHandler) Fetch(c *gin.Context) {
 }
 
 type CreateGroupRequest struct {
-	Name         string   `json:"name" binding:"required"`
-	Description  string   `json:"description"`
-	URLs         []string `json:"urls" binding:"required"`
-	Emails       []string `json:"emails"`
-	PromptConfig string   `json:"prompt_config"`
-	Frequency    string   `json:"frequency"` // "daily", "weekly", "monthly"
+	Name              string   `json:"name" binding:"required"`
+	Description       string   `json:"description"`
+	URLs              []string `json:"urls" binding:"required"`
+	Emails            []string `json:"emails"`
+	PromptConfig      string   `json:"prompt_config"`
+	EmailPromptConfig string   `json:"email_prompt_config"`
+	Frequency         string   `json:"frequency"` // "daily", "weekly", "monthly"
 }
 
 func (h *RSSHandler) GetPopularSources(c *gin.Context) {
@@ -105,7 +111,7 @@ func (h *RSSHandler) CreateGroup(c *gin.Context) {
 		return
 	}
 
-	group, err := h.rssService.CreateGroup(userID, req.Name, req.Description, req.URLs, req.Emails, req.PromptConfig, req.Frequency)
+	group, err := h.rssService.CreateGroup(userID, req.Name, req.Description, req.URLs, req.Emails, req.PromptConfig, req.EmailPromptConfig, req.Frequency)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -131,7 +137,8 @@ func (h *RSSHandler) GetMyGroups(c *gin.Context) {
 }
 
 type GenerateGroupReportRequest struct {
-	GroupID string `json:"group_id" binding:"required"`
+	GroupID   string `json:"group_id" binding:"required"`
+	SendEmail bool   `json:"send_email"`
 }
 
 func (h *RSSHandler) UpdateGroup(c *gin.Context) {
@@ -139,16 +146,17 @@ func (h *RSSHandler) UpdateGroup(c *gin.Context) {
 	groupID := c.Param("id")
 
 	var req struct {
-		Name         string   `json:"name" binding:"required"`
-		URLs         []string `json:"urls" binding:"required"`
-		PromptConfig string   `json:"prompt_config"`
+		Name              string   `json:"name" binding:"required"`
+		URLs              []string `json:"urls" binding:"required"`
+		PromptConfig      string   `json:"prompt_config"`
+		EmailPromptConfig string   `json:"email_prompt_config"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err := h.rssService.UpdateGroup(userID, groupID, req.Name, req.URLs, req.PromptConfig)
+	err := h.rssService.UpdateGroup(userID, groupID, req.Name, req.URLs, req.PromptConfig, req.EmailPromptConfig)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -214,6 +222,24 @@ func (h *RSSHandler) GenerateGroupReport(c *gin.Context) {
 		_, err = h.rssService.SaveSummaryReport(userID, group.ID, title, reportContent)
 		if err != nil {
 			return
+		}
+
+		// 5. Send email if requested
+		if req.SendEmail && group.NotificationEmails != "" {
+			var emails []string
+			if err := json.Unmarshal([]byte(group.NotificationEmails), &emails); err == nil && len(emails) > 0 {
+
+				emailContent := reportContent
+				// Apply custom email formatting prompt if configured in the group
+				if group.EmailPromptConfig != "" {
+					formattedContent, err := h.aiService.GenerateReport(reportContent, group.EmailPromptConfig)
+					if err == nil && formattedContent != "" {
+						emailContent = formattedContent
+					}
+				}
+
+				h.notificationService.SendEmail(emails, title, emailContent)
+			}
 		}
 	}()
 }

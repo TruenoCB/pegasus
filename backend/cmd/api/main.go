@@ -73,7 +73,7 @@ func main() {
 	// Initialize Handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	aiHandler := handlers.NewAIHandler(aiService, esService)
-	rssHandler := handlers.NewRSSHandler(rssService, aiService)
+	rssHandler := handlers.NewRSSHandler(rssService, aiService, notificationService)
 	reportHandler := handlers.NewReportHandler(reportService)
 	socialHandler := handlers.NewSocialHandler(socialService)
 

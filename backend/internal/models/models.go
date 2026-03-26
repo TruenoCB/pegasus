@@ -38,9 +38,10 @@ type RSSGroup struct {
 	AssetID            string    `gorm:"type:varchar(36);not null;index;unique" json:"asset_id"` // Links to Asset table, 1-to-1
 	Name               string    `gorm:"type:varchar(255);not null" json:"name"`
 	Description        string    `gorm:"type:text" json:"description"`
-	FeedConfigs        string    `gorm:"type:text" json:"feed_configs"`        // JSON array of feed URLs
-	NotificationEmails string    `gorm:"type:text" json:"notification_emails"` // JSON array of emails
-	PromptConfig       string    `gorm:"type:text" json:"prompt_config"`       // Custom prompt for AI summarization
+	FeedConfigs        string    `gorm:"type:text" json:"feed_configs"`                             // JSON array of feed URLs
+	NotificationEmails string    `gorm:"type:text" json:"notification_emails"`                      // JSON array of emails
+	PromptConfig       string    `gorm:"type:text" json:"prompt_config"`                            // Custom prompt for AI summarization
+	EmailPromptConfig  string    `gorm:"type:text" json:"email_prompt_config"`                      // Custom prompt for Email formatting
 	ReportFrequency    string    `gorm:"type:varchar(255);default:'daily'" json:"report_frequency"` // Comma-separated: "daily,weekly,monthly"
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`

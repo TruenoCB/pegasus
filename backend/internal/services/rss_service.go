@@ -25,7 +25,7 @@ func NewRSSService(db *gorm.DB) *RSSService {
 	}
 }
 
-func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, emails []string, promptConfig string, frequency string) (*models.RSSGroup, error) {
+func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, emails []string, promptConfig string, emailPromptConfig string, frequency string) (*models.RSSGroup, error) {
 	urlsJson, _ := json.Marshal(urls)
 	emailsJson, _ := json.Marshal(emails)
 
@@ -54,6 +54,7 @@ func (s *RSSService) CreateGroup(userID, name, desc string, urls []string, email
 		FeedConfigs:        string(urlsJson),
 		NotificationEmails: string(emailsJson),
 		PromptConfig:       promptConfig,
+		EmailPromptConfig:  emailPromptConfig,
 		ReportFrequency:    frequency,
 	}
 	if err := s.db.Create(&group).Error; err != nil {
@@ -80,7 +81,7 @@ func (s *RSSService) GetUserGroups(userID string) ([]models.RSSGroup, error) {
 	return groups, err
 }
 
-func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, promptConfig string) error {
+func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, promptConfig string, emailPromptConfig string) error {
 	var group models.RSSGroup
 
 	// First check if the group exists and belongs to the user
@@ -100,9 +101,10 @@ func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, pr
 	})
 
 	return s.db.Model(&group).Updates(map[string]interface{}{
-		"name":          name,
-		"feed_configs":  string(urlsJson),
-		"prompt_config": promptConfig,
+		"name":                name,
+		"feed_configs":        string(urlsJson),
+		"prompt_config":       promptConfig,
+		"email_prompt_config": emailPromptConfig,
 	}).Error
 }
 
