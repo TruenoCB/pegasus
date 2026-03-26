@@ -3,6 +3,8 @@ import { useAuthStore } from '../store/authStore';
 import { User, Settings, Shield, Award, Globe, Mail, Link as LinkIcon, Edit3, Zap, LogOut, X, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import AssetViewerModal from '../components/AssetViewerModal';
+
 const Profile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user: currentUser, token, logout, login } = useAuthStore();
@@ -26,6 +28,9 @@ const Profile: React.FC = () => {
   const [followingUsers, setFollowingUsers] = useState<any[]>([]);
 
   const [followerUsers, setFollowerUsers] = useState<any[]>([]);
+
+  const [savedAssets, setSavedAssets] = useState<any[]>([]);
+  const [viewingAssetId, setViewingAssetId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -87,6 +92,14 @@ const Profile: React.FC = () => {
           });
           if (followersRes.ok) {
             setFollowerUsers(await followersRes.json());
+          }
+
+          // Fetch saved assets
+          const savedRes = await fetch('/api/social/assets/saved', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (savedRes.ok) {
+            setSavedAssets(await savedRes.json());
           }
         }
       } catch (error) {
@@ -281,7 +294,12 @@ const Profile: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               {popularAssets.length > 0 ? (
                 popularAssets.map((asset, idx) => (
-                  <div key={asset.id} className="p-2 bg-blue-500/10 rounded-lg text-blue-400 border border-blue-500/20 relative group cursor-pointer" title={asset.title}>
+                  <div 
+                    key={asset.id} 
+                    onClick={() => setViewingAssetId(asset.id)}
+                    className="p-2 bg-blue-500/10 rounded-lg text-blue-400 border border-blue-500/20 relative group cursor-pointer hover:bg-blue-500/20 transition-colors" 
+                    title={asset.title}
+                  >
                     <div className="w-8 h-8 flex items-center justify-center font-black uppercase">
                       {asset.title?.[0] || 'A'}
                     </div>
@@ -317,21 +335,61 @@ const Profile: React.FC = () => {
             <div className="grid grid-cols-1 gap-4">
               {assets.length === 0 ? (
                 <div className="text-center py-6 text-gray-500 border border-dashed border-white/10 rounded-3xl text-sm">
-                  You haven't created any assets yet. Head to AURORA to create an RSS Group.
+                  {isMe ? "You haven't created any assets yet." : "This user hasn't created any assets."}
                 </div>
               ) : (
-                assets.slice(0, 3).map((item) => (
-                  <div key={item.id} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center justify-between group hover:bg-white/10 transition-all cursor-pointer">
+                assets.slice(0, 5).map((item) => (
+                  <div 
+                    key={item.id} 
+                    onClick={() => setViewingAssetId(item.id)}
+                    className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center justify-between group hover:bg-white/10 transition-all cursor-pointer"
+                  >
                     <div>
                       <h4 className="font-bold group-hover:text-yellow-400 transition-colors">{item.title}</h4>
                       <p className="text-xs text-gray-500">{item.type.replace('_', ' ')} • {new Date(item.created_at).toLocaleDateString()}</p>
                     </div>
-                    <Settings className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
+                    <div className="flex gap-3">
+                      <button className="px-3 py-1.5 bg-blue-500/10 text-blue-400 text-xs font-bold rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        View
+                      </button>
+                      {!isMe && (
+                        <button className="px-3 py-1.5 bg-green-500/10 text-green-400 text-xs font-bold rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); alert('Trade feature coming soon!'); }}>
+                          Trade
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
             </div>
           </div>
+
+          {isMe && savedAssets.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                Saved Assets
+              </h3>
+              <div className="grid grid-cols-1 gap-4">
+                {savedAssets.slice(0, 5).map((item) => (
+                  <div 
+                    key={item.id} 
+                    onClick={() => setViewingAssetId(item.id)}
+                    className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center justify-between group hover:bg-white/10 transition-all cursor-pointer"
+                  >
+                    <div>
+                      <h4 className="font-bold group-hover:text-yellow-400 transition-colors">{item.title}</h4>
+                      <p className="text-xs text-gray-500">{item.type.replace('_', ' ')} • Saved on {new Date(item.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button className="px-3 py-1.5 bg-blue-500/10 text-blue-400 text-xs font-bold rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        View
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-4">
             <h3 className="text-xl font-bold flex items-center gap-2">
@@ -421,6 +479,10 @@ const Profile: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {viewingAssetId && (
+        <AssetViewerModal assetId={viewingAssetId} onClose={() => setViewingAssetId(null)} />
       )}
     </div>
   );

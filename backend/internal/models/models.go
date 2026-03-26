@@ -4,6 +4,13 @@ import (
 	"time"
 )
 
+type SavedAsset struct {
+	ID        string    `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
+	UserID    string    `gorm:"type:varchar(36);not null;index;uniqueIndex:idx_user_asset" json:"user_id"`
+	AssetID   string    `gorm:"type:varchar(36);not null;index;uniqueIndex:idx_user_asset" json:"asset_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type User struct {
 	ID           string           `gorm:"primaryKey;type:varchar(36);default:(UUID())" json:"id"`
 	Email        string           `gorm:"uniqueIndex;type:varchar(255);not null" json:"email"`
@@ -16,6 +23,7 @@ type User struct {
 	CreatedAt    time.Time        `json:"created_at"`
 	UpdatedAt    time.Time        `json:"updated_at"`
 	Assets       []Asset          `gorm:"foreignKey:UserID" json:"assets,omitempty"`
+	SavedAssets  []SavedAsset     `gorm:"foreignKey:UserID" json:"saved_assets,omitempty"`
 	Following    []SocialRelation `gorm:"foreignKey:FollowerID" json:"following,omitempty"`
 	Followers    []SocialRelation `gorm:"foreignKey:FollowingID" json:"followers,omitempty"`
 }

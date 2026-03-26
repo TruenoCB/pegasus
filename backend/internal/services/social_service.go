@@ -104,6 +104,64 @@ func (s *SocialService) GetUserAssets(userID string) ([]models.Asset, error) {
 	return assets, err
 }
 
+func (s *SocialService) GetSavedAssets(userID string) ([]models.Asset, error) {
+	var assets []models.Asset
+	err := s.db.Table("assets").
+		Joins("JOIN saved_assets ON assets.id = saved_assets.asset_id").
+		Where("saved_assets.user_id = ?", userID).
+		Order("saved_assets.created_at desc").
+		Find(&assets).Error
+	return assets, err
+}
+
+func (s *SocialService) ToggleSaveAsset(userID, assetID string) error {
+	var existing models.SavedAsset
+	err := s.db.Where("user_id = ? AND asset_id = ?", userID, assetID).First(&existing).Error
+	if err == nil {
+		// Already saved, unsave
+		return s.db.Delete(&existing).Error
+	}
+
+	saved := models.SavedAsset{
+		ID:      uuid.New().String(),
+		UserID:  userID,
+		AssetID: assetID,
+	}
+	return s.db.Create(&saved).Error
+}
+
+func (s *SocialService) GetAssetDetails(assetID string) (interface{}, error) {
+	var asset models.Asset
+	if err := s.db.Where("id = ?", assetID).First(&asset).Error; err != nil {
+		return nil, err
+	}
+
+	switch asset.Type {
+	case "RSS_GROUP":
+		var group models.RSSGroup
+		if err := s.db.Where("asset_id = ?", assetID).First(&group).Error; err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"asset": asset,
+			"group": group,
+		}, nil
+	case "SUMMARY_REPORT":
+		var report models.SummaryReport
+		if err := s.db.Where("asset_id = ?", assetID).First(&report).Error; err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"asset":  asset,
+			"report": report,
+		}, nil
+	default:
+		return map[string]interface{}{
+			"asset": asset,
+		}, nil
+	}
+}
+
 func (s *SocialService) GetProfileStats(userID string) (map[string]int64, error) {
 	var postCount, followingCount, followerCount, assetCount int64
 

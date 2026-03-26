@@ -3,6 +3,8 @@ import { Heart, MessageCircle, Share2, MoreHorizontal, User, Shield, Zap, Search
 import { useAuthStore } from '../store/authStore';
 import { Link } from 'react-router-dom';
 
+import AssetViewerModal from '../components/AssetViewerModal';
+
 const Social: React.FC = () => {
   const { token, user } = useAuthStore();
   const [posts, setPosts] = useState<any[]>([]);
@@ -17,6 +19,7 @@ const Social: React.FC = () => {
   const [commentingOn, setCommentingOn] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
   const [quotePost, setQuotePost] = useState<any | null>(null);
+  const [viewingAssetId, setViewingAssetId] = useState<string | null>(null);
 
   const [trendingTags, setTrendingTags] = useState<string[]>([]);
 
@@ -348,16 +351,22 @@ const Social: React.FC = () => {
 
                 {/* Shared Asset Rendering */}
                 {post.asset && (
-                  <div className="mb-4 p-4 border border-blue-500/20 bg-blue-500/5 rounded-2xl flex items-start gap-4">
+                  <div 
+                    onClick={() => setViewingAssetId(post.asset.id)}
+                    className="mb-4 p-4 border border-blue-500/20 bg-blue-500/5 rounded-2xl flex items-start gap-4 cursor-pointer hover:bg-blue-500/10 transition-colors"
+                  >
                     <div className="p-3 bg-blue-500/10 rounded-xl">
                       <Zap className="w-6 h-6 text-blue-400" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <h5 className="font-bold text-blue-400 mb-1">{post.asset.title}</h5>
                       <p className="text-sm text-gray-400 line-clamp-2">{post.asset.description}</p>
                       <div className="mt-2 text-[10px] uppercase tracking-widest text-gray-500 font-bold border border-white/10 inline-block px-2 py-1 rounded">
                         {post.asset.type.replace('_', ' ')}
                       </div>
+                    </div>
+                    <div className="text-xs font-bold text-blue-400 px-3 py-1 bg-blue-500/10 rounded-full shrink-0">
+                      View
                     </div>
                   </div>
                 )}
@@ -489,6 +498,10 @@ const Social: React.FC = () => {
           </div>
         </div>
       </aside>
+      
+      {viewingAssetId && (
+        <AssetViewerModal assetId={viewingAssetId} onClose={() => setViewingAssetId(null)} />
+      )}
     </div>
   );
 };

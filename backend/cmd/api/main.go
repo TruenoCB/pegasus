@@ -35,6 +35,7 @@ func main() {
 		db.AutoMigrate(
 			&models.User{},
 			&models.Asset{},
+			&models.SavedAsset{},
 			&models.RSSGroup{},
 			&models.RSSFeed{},
 			&models.AISummary{},
@@ -136,6 +137,10 @@ func main() {
 			protected.POST("/social/follow/:id", socialHandler.ToggleFollow)
 			protected.GET("/social/users/:id/stats", socialHandler.GetProfileStats)
 			protected.GET("/social/users/me/assets", socialHandler.GetUserAssets)
+			protected.GET("/social/users/:id/assets", socialHandler.GetUserAssets) // Get assets of another user
+			protected.GET("/social/assets/saved", socialHandler.GetSavedAssets)
+			protected.POST("/social/assets/:id/save", socialHandler.ToggleSaveAsset)
+			protected.GET("/social/assets/:id", socialHandler.GetAssetDetails)
 
 			// Chat
 			protected.GET("/chat/users", socialHandler.GetUsers)

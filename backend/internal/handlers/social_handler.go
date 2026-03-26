@@ -96,7 +96,10 @@ func (h *SocialHandler) ToggleFollow(c *gin.Context) {
 }
 
 func (h *SocialHandler) GetUserAssets(c *gin.Context) {
-	userID := c.GetString("user_id")
+	userID := c.Param("id")
+	if userID == "me" || userID == "" {
+		userID = c.GetString("user_id")
+	}
 
 	assets, err := h.socialService.GetUserAssets(userID)
 	if err != nil {
@@ -104,6 +107,39 @@ func (h *SocialHandler) GetUserAssets(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, assets)
+}
+
+func (h *SocialHandler) GetSavedAssets(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	assets, err := h.socialService.GetSavedAssets(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, assets)
+}
+
+func (h *SocialHandler) ToggleSaveAsset(c *gin.Context) {
+	userID := c.GetString("user_id")
+	assetID := c.Param("id")
+
+	if err := h.socialService.ToggleSaveAsset(userID, assetID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
+func (h *SocialHandler) GetAssetDetails(c *gin.Context) {
+	assetID := c.Param("id")
+	
+	assetDetails, err := h.socialService.GetAssetDetails(assetID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found or details unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, assetDetails)
 }
 
 func (h *SocialHandler) GetProfileStats(c *gin.Context) {
