@@ -18,6 +18,8 @@ const Profile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editWebsite, setEditWebsite] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [popularAssets, setPopularAssets] = useState<any[]>([]);
 
@@ -81,6 +83,8 @@ const Profile: React.FC = () => {
   const handleEditProfile = () => {
     setEditName(user?.name || '');
     setEditBio(user?.bio || 'Digital pioneer exploring the boundaries of PEGASUS. Everything is an asset. AI is my second brain.');
+    setEditLocation(user?.location || '');
+    setEditWebsite(user?.website || '');
     setIsEditing(true);
   };
 
@@ -93,7 +97,7 @@ const Profile: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ name: editName, bio: editBio })
+        body: JSON.stringify({ name: editName, bio: editBio, location: editLocation, website: editWebsite })
       });
       if (res.ok) {
         const updatedUser = await res.json();
@@ -156,13 +160,20 @@ const Profile: React.FC = () => {
             </p>
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm text-gray-500">
-                <Globe className="w-4 h-4" /> <span>Earth</span>
+                <Globe className="w-4 h-4" /> <span>{user?.location || 'Earth'}</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-gray-500">
                 <Mail className="w-4 h-4" /> <span>{user?.email || 'not_set'}</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-gray-500">
-                <LinkIcon className="w-4 h-4" /> <span className="text-blue-400 hover:underline cursor-pointer">pegasus.io/u/{user?.name?.toLowerCase().replace(/\s+/g, '')}</span>
+                <LinkIcon className="w-4 h-4" /> 
+                {user?.website ? (
+                  <a href={user.website.startsWith('http') ? user.website : `https://${user.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                    {user.website}
+                  </a>
+                ) : (
+                  <span className="text-blue-400 hover:underline cursor-pointer">pegasus.io/u/{user?.name?.toLowerCase().replace(/\s+/g, '')}</span>
+                )}
               </div>
             </div>
           </div>
@@ -280,6 +291,26 @@ const Profile: React.FC = () => {
                   onChange={(e) => setEditBio(e.target.value)}
                   rows={4}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Location</label>
+                <input 
+                  type="text" 
+                  value={editLocation}
+                  onChange={(e) => setEditLocation(e.target.value)}
+                  placeholder="e.g. Earth, Mars, Tokyo..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Website / Link</label>
+                <input 
+                  type="text" 
+                  value={editWebsite}
+                  onChange={(e) => setEditWebsite(e.target.value)}
+                  placeholder="e.g. pegasus.io/u/yourname"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
               <button 

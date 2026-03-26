@@ -209,18 +209,9 @@ const Aurora: React.FC = () => {
                 body: JSON.stringify({ group_id: groupId }),
             });
             if (res.ok) {
-                const report = await res.json();
-                alert('Report generated successfully!');
+                alert('Report generation started in the background. Please check the AI Summaries tab in a few moments.');
                 
-                // Refresh reports and open the results tab
-                const reportsRes = await fetch('/api/rss/reports/me', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (reportsRes.ok) {
-                    setMyReports(await reportsRes.json());
-                }
-                
-                setSelectedReport(report);
+                // Switch to results tab to wait for it
                 setActiveTab('results');
             } else {
                 const data = await res.json();

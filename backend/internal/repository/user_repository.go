@@ -31,6 +31,10 @@ func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
+func (r *UserRepository) Update(user *models.User) error {
+	return r.db.Save(user).Error
+}
+
 func (r *UserRepository) FindByID(id string) (*models.User, error) {
 	var user models.User
 	if err := r.db.Where("id = ?", id).First(&user).Error; err != nil {

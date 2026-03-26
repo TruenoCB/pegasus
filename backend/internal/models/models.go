@@ -11,6 +11,8 @@ type User struct {
 	Name         string           `gorm:"type:varchar(100);not null" json:"name"`
 	AvatarURL    string           `gorm:"type:varchar(500)" json:"avatar_url"`
 	Bio          string           `gorm:"type:text" json:"bio"`
+	Location     string           `gorm:"type:varchar(100)" json:"location"` // E.g. "Earth"
+	Website      string           `gorm:"type:varchar(255)" json:"website"`  // E.g. "pegasus.io/u/bo"
 	CreatedAt    time.Time        `json:"created_at"`
 	UpdatedAt    time.Time        `json:"updated_at"`
 	Assets       []Asset          `gorm:"foreignKey:UserID" json:"assets,omitempty"`

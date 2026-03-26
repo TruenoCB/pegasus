@@ -18,6 +18,8 @@ const Social: React.FC = () => {
   const [newComment, setNewComment] = useState('');
   const [quotePost, setQuotePost] = useState<any | null>(null);
 
+  const [trendingTags, setTrendingTags] = useState<string[]>([]);
+
   const fetchPosts = async () => {
     try {
       const res = await fetch('/api/social/posts', {
@@ -26,6 +28,23 @@ const Social: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         setPosts(data);
+        
+        // Extract real trending tags from recent posts
+        const tagMap: Record<string, number> = {};
+        data.forEach((post: any) => {
+            const matches = post.content.match(/#[a-zA-Z0-9_]+/g);
+            if (matches) {
+                matches.forEach((tag: string) => {
+                    tagMap[tag] = (tagMap[tag] || 0) + 1;
+                });
+            }
+        });
+        const sortedTags = Object.entries(tagMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(entry => entry[0]);
+            
+        setTrendingTags(sortedTags.length > 0 ? sortedTags : ['#Welcome', '#Pegasus']);
       }
     } catch (error) {
       console.error("Failed to fetch posts", error);
@@ -213,8 +232,8 @@ const Social: React.FC = () => {
         <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
           <h4 className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-500">Trending Assets</h4>
           <ul className="space-y-4">
-            {['#AI_Ethics', '#Web3_Social', '#DataPrivacy', '#PegasusVibe'].map((tag) => (
-              <li key={tag} className="flex justify-between items-center group cursor-pointer">
+            {trendingTags.map((tag) => (
+              <li key={tag} className="flex justify-between items-center group cursor-pointer" onClick={() => setNewPostContent(prev => prev ? `${prev} ${tag}` : tag)}>
                 <span className="text-sm text-gray-400 group-hover:text-white transition-colors">{tag}</span>
                 <TrendingUpIcon className="w-3 h-3 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
               </li>

@@ -84,6 +84,24 @@ func (s *AuthService) GetProfile(userID string) (*models.User, error) {
 	return s.userRepo.FindByID(userID)
 }
 
+func (s *AuthService) UpdateProfile(userID string, name, bio, location, website string) (*models.User, error) {
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	user.Name = name
+	user.Bio = bio
+	user.Location = location
+	user.Website = website
+
+	if err := s.userRepo.Update(user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
 func (s *AuthService) generateToken(userID string) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,

@@ -177,44 +177,45 @@ func (h *RSSHandler) GenerateGroupReport(c *gin.Context) {
 		return
 	}
 
-	// 2. Fetch all feeds
-	var urls []string
-	if err := json.Unmarshal([]byte(group.FeedConfigs), &urls); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid feed configs"})
-		return
-	}
+	// Respond immediately to let frontend know it's started
+	c.JSON(http.StatusAccepted, gin.H{"status": "generating", "message": "Report generation started in background"})
 
-	var allItemsContent string
-	for _, url := range urls {
-		_, items, err := h.rssService.FetchAndParse(url)
-		if err == nil {
-			for _, item := range items {
-				// Only take the first 500 chars to avoid huge context
-				content := item.OriginalContent
-				if len(content) > 500 {
-					content = content[:500] + "..."
+	// 2. Run the rest of the process asynchronously
+	go func() {
+		// 2. Fetch all feeds
+		var urls []string
+		if err := json.Unmarshal([]byte(group.FeedConfigs), &urls); err != nil {
+			return
+		}
+
+		var allItemsContent string
+		for _, url := range urls {
+			_, items, err := h.rssService.FetchAndParse(url)
+			if err == nil {
+				for _, item := range items {
+					// Only take the first 500 chars to avoid huge context
+					content := item.OriginalContent
+					if len(content) > 500 {
+						content = content[:500] + "..."
+					}
+					allItemsContent += fmt.Sprintf("Title: %s\nContent: %s\n\n", item.OriginalTitle, content)
 				}
-				allItemsContent += fmt.Sprintf("Title: %s\nContent: %s\n\n", item.OriginalTitle, content)
 			}
 		}
-	}
 
-	// 3. Generate AI Report using prompt config
-	reportContent, err := h.aiService.GenerateReport(allItemsContent, group.PromptConfig)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate report: " + err.Error()})
-		return
-	}
+		// 3. Generate AI Report using prompt config
+		reportContent, err := h.aiService.GenerateReport(allItemsContent, group.PromptConfig)
+		if err != nil {
+			return
+		}
 
-	// 4. Save as permanent asset
-	title := fmt.Sprintf("Report for %s - %s", group.Name, time.Now().Format("2006-01-02"))
-	report, err := h.rssService.SaveSummaryReport(userID, group.ID, title, reportContent)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save report"})
-		return
-	}
-
-	c.JSON(http.StatusOK, report)
+		// 4. Save as permanent asset
+		title := fmt.Sprintf("Report for %s - %s", group.Name, time.Now().Format("2006-01-02"))
+		_, err = h.rssService.SaveSummaryReport(userID, group.ID, title, reportContent)
+		if err != nil {
+			return
+		}
+	}()
 }
 
 func (h *RSSHandler) GetSummaryReports(c *gin.Context) {
