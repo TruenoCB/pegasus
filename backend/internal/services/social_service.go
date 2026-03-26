@@ -149,7 +149,7 @@ type UserWithFollowStatus struct {
 
 func (s *SocialService) GetUsers(query string, mutualWithUserID string, currentUserID string) ([]UserWithFollowStatus, error) {
 	var users []models.User
-	dbQuery := s.db.Select("id", "name", "email", "avatar_url")
+	dbQuery := s.db.Table("users").Select("users.id", "users.name", "users.email", "users.avatar_url")
 
 	if mutualWithUserID != "" {
 		// Only mutual followers
@@ -158,14 +158,14 @@ func (s *SocialService) GetUsers(query string, mutualWithUserID string, currentU
 	}
 
 	if query != "" {
-		dbQuery = dbQuery.Where("name LIKE ? OR email LIKE ?", "%"+query+"%", "%"+query+"%")
+		dbQuery = dbQuery.Where("users.name LIKE ? OR users.email LIKE ?", "%"+query+"%", "%"+query+"%")
 	}
-	
+
 	// Exclude current user
 	if currentUserID != "" {
 		dbQuery = dbQuery.Where("users.id != ?", currentUserID)
 	}
-	
+
 	err := dbQuery.Limit(50).Find(&users).Error
 	if err != nil {
 		return nil, err
@@ -175,7 +175,32 @@ func (s *SocialService) GetUsers(query string, mutualWithUserID string, currentU
 	for _, u := range users {
 		isFollowing := false
 		if currentUserID != "" {
-			s.db.Model(&models.SocialRelation{}).Where("follower_id = ? AND following_id = ? AND type = 'follow'", currentUserID, u.ID).Select("count(*) > 0").Find(&isFollowing)
+			s.db.Model(&models.SocialRelation{}).Where("follower_id = ? AND following_id = ? AND type = 'follow'", currentUserID, u.ID).Select("count(*) > 0").Scan(&isFollowing)
+		}
+		result = append(result, UserWithFollowStatus{User: u, IsFollowing: isFollowing})
+	}
+
+	return result, nil
+}
+
+func (s *SocialService) GetFollowers(userID string, currentUserID string) ([]UserWithFollowStatus, error) {
+	var users []models.User
+	// Join users table with social_relations where users.id = social_relations.follower_id
+	dbQuery := s.db.Table("users").
+		Select("users.id", "users.name", "users.email", "users.avatar_url").
+		Joins("JOIN social_relations ON users.id = social_relations.follower_id").
+		Where("social_relations.following_id = ? AND social_relations.type = 'follow'", userID)
+
+	err := dbQuery.Limit(50).Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+
+	var result []UserWithFollowStatus
+	for _, u := range users {
+		isFollowing := false
+		if currentUserID != "" {
+			s.db.Model(&models.SocialRelation{}).Where("follower_id = ? AND following_id = ? AND type = 'follow'", currentUserID, u.ID).Select("count(*) > 0").Scan(&isFollowing)
 		}
 		result = append(result, UserWithFollowStatus{User: u, IsFollowing: isFollowing})
 	}

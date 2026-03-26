@@ -291,7 +291,7 @@ func (s *RSSService) GetPopularSources() ([]models.PopularSource, error) {
 	// Add dynamically found sources
 	for url, count := range urlCounts {
 		if preset, exists := presetMap[url]; exists {
-			preset.Subscribers = 1000 + (count * 42) // Add weight to real subscriptions
+			preset.Subscribers = count // Real count
 			finalSources = append(finalSources, preset)
 			delete(presetMap, url) // mark as processed
 		} else {
@@ -301,14 +301,14 @@ func (s *RSSService) GetPopularSources() ([]models.PopularSource, error) {
 				URL:         url,
 				Category:    "Community",
 				IconType:    "Globe", // default icon
-				Subscribers: count * 42,
+				Subscribers: count,
 			})
 		}
 	}
 
 	// Add remaining presets that no one subscribed to yet (so the page isn't empty initially)
 	for _, p := range presetMap {
-		p.Subscribers = 1000 // base value
+		p.Subscribers = 0 // base value
 		finalSources = append(finalSources, p)
 	}
 
@@ -333,11 +333,12 @@ func (s *RSSService) SeedPopularSources() {
 	var count int64
 	s.db.Model(&models.PopularSource{}).Count(&count)
 	if count == 0 {
+		// Default seed list with mock numbers replaced by 0 (or a default base)
 		sources := []models.PopularSource{
-			{ID: uuid.New().String(), Name: "TechCrunch", URL: "https://techcrunch.com/feed/", Category: "Technology", IconType: "Cpu", Subscribers: 1205},
-			{ID: uuid.New().String(), Name: "36Kr", URL: "https://36kr.com/feed", Category: "Business", IconType: "TrendingUp", Subscribers: 890},
-			{ID: uuid.New().String(), Name: "The Verge", URL: "https://www.theverge.com/rss/index.xml", Category: "Tech/Culture", IconType: "Globe", Subscribers: 2300},
-			{ID: uuid.New().String(), Name: "BBC News", URL: "http://feeds.bbci.co.uk/news/rss.xml", Category: "World", IconType: "Newspaper", Subscribers: 5000},
+			{ID: uuid.New().String(), Name: "TechCrunch", URL: "https://techcrunch.com/feed/", Category: "Technology", Subscribers: 0, IconType: "Cpu"},
+			{ID: uuid.New().String(), Name: "Hacker News", URL: "https://news.ycombinator.com/rss", Category: "Technology", Subscribers: 0, IconType: "TrendingUp"},
+			{ID: uuid.New().String(), Name: "The Verge", URL: "https://techcrunch.com/feed/", Category: "Startups", Subscribers: 0, IconType: "Globe"},
+			{ID: uuid.New().String(), Name: "Wired", URL: "https://www.wired.com/feed/rss", Category: "Technology", Subscribers: 0, IconType: "Newspaper"},
 		}
 		s.db.Create(&sources)
 	}

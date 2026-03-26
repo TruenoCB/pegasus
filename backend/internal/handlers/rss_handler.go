@@ -254,6 +254,16 @@ func (h *RSSHandler) GenerateGroupReport(c *gin.Context) {
 
 						// Map phase: Fetch linked content
 						text := fetchArticleText(it.Link)
+
+						// If scraping failed or returned too little content, ask LLM to extract links
+						if len(text) < 100 {
+							fallbackPrompt := "The following is an RSS item content. It might contain a link to the full article. Please extract the main URL from it. Only output the URL, nothing else:\n\n" + it.OriginalContent
+							extractedLink, err := h.aiService.GenerateReport(it.OriginalContent, fallbackPrompt)
+							if err == nil && strings.HasPrefix(extractedLink, "http") {
+								text = fetchArticleText(strings.TrimSpace(extractedLink))
+							}
+						}
+
 						if text == "" {
 							text = it.OriginalContent
 						}
@@ -262,7 +272,7 @@ func (h *RSSHandler) GenerateGroupReport(c *gin.Context) {
 						}
 
 						// Summarize individual article
-						mapPrompt := "Please summarize the core points of the following article in 100-150 words. Focus on the most important facts."
+						mapPrompt := "Please summarize the core points of the following article in 100-150 words. Extract the most valuable factual information and ignore ads or navigation text."
 						summary, err := h.aiService.GenerateReport(text, mapPrompt)
 						if err != nil {
 							// fallback

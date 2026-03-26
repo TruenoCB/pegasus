@@ -25,6 +25,8 @@ const Profile: React.FC = () => {
 
   const [followingUsers, setFollowingUsers] = useState<any[]>([]);
 
+  const [followerUsers, setFollowerUsers] = useState<any[]>([]);
+
   useEffect(() => {
     const fetchData = async () => {
       if (!token || !targetUserId) return;
@@ -77,6 +79,14 @@ const Profile: React.FC = () => {
           if (usersRes.ok) {
             const allUsers = await usersRes.json();
             setFollowingUsers(allUsers.filter((u: any) => u.is_following));
+          }
+
+          // Fetch followers list
+          const followersRes = await fetch('/api/social/users/me/followers', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (followersRes.ok) {
+            setFollowerUsers(await followersRes.json());
           }
         }
       } catch (error) {
@@ -231,6 +241,37 @@ const Profile: React.FC = () => {
                 ))
               ) : (
                 <span className="text-sm text-gray-500">Not following anyone yet</span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
+            <h3 className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-500">Followers</h3>
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+              {followerUsers.length > 0 ? (
+                followerUsers.map(u => (
+                  <div key={u.id} className="flex items-center justify-between group">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden shrink-0">
+                        {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : u.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold truncate max-w-[100px]">{u.name}</span>
+                        <span className="text-[10px] text-gray-500 truncate max-w-[100px]">@{u.email.split('@')[0]}</span>
+                      </div>
+                    </div>
+                    {isMe && (
+                      <button 
+                        onClick={() => handleUnfollow(u.id)} // Same toggle function works for following them back or unfollowing
+                        className={`text-[10px] px-2 py-1 border rounded-full transition-all ${u.is_following ? 'border-white/20 text-gray-400 hover:text-red-400 hover:border-red-400' : 'bg-white text-black border-transparent hover:bg-gray-200'}`}
+                      >
+                        {u.is_following ? 'Unfollow' : 'Follow Back'}
+                      </button>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <span className="text-sm text-gray-500">No followers yet</span>
               )}
             </div>
           </div>

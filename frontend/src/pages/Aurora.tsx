@@ -47,6 +47,8 @@ const Aurora: React.FC = () => {
     const [promptConfig, setPromptConfig] = useState('Please summarize the key points, extracting the most important insights and technical details. Format the output in Markdown.');
     const [emailPromptConfig, setEmailPromptConfig] = useState('');
     const [generateImmediately, setGenerateImmediately] = useState(true);
+    const [sendEmailToggle, setSendEmailToggle] = useState(false);
+    const [editSendEmailToggle, setEditSendEmailToggle] = useState(false);
     const [creatingGroup, setCreatingGroup] = useState(false);
     
     // Support multiple frequencies: daily, weekly, monthly
@@ -152,7 +154,7 @@ const Aurora: React.FC = () => {
         
         setCreatingGroup(true);
         try {
-            const frequencyStr = frequencies.join(','); // Send as comma separated string
+            const frequencyStr = sendEmailToggle ? frequencies.join(',') : ''; // Send as comma separated string or empty if no email
             const res = await fetch('/api/rss/group', {
                 method: 'POST',
                 headers: { 
@@ -179,7 +181,7 @@ const Aurora: React.FC = () => {
                 setCustomUrls('');
                 setPromptConfig('Please summarize the key points, extracting the most important insights and technical details. Format the output in Markdown.');
                 setEmailPromptConfig('');
-                setFrequencies(['daily']);
+                setSendEmailToggle(false);
                 
                 // Refresh my groups
                 const groupsRes = await fetch('/api/rss/groups/me', {
@@ -251,6 +253,14 @@ const Aurora: React.FC = () => {
         }
         setEditGroupPrompt(group.prompt_config || '');
         setEditGroupEmailPrompt(group.email_prompt_config || '');
+        try {
+            const freqs = group.frequency ? group.frequency.split(',').filter(Boolean) : [];
+            setEditFrequencies(freqs.length > 0 ? freqs : ['daily']);
+            setEditSendEmailToggle(freqs.length > 0);
+        } catch {
+            setEditFrequencies(['daily']);
+            setEditSendEmailToggle(false);
+        }
     };
 
     const handleSaveGroup = async () => {
@@ -275,7 +285,7 @@ const Aurora: React.FC = () => {
                     emails: editGroupEmails.split(',').map(e => e.trim()).filter(e => e),
                     prompt_config: editGroupPrompt,
                     email_prompt_config: editGroupEmailPrompt,
-                    frequency: editFrequencies.join(',')
+                    frequency: editSendEmailToggle ? editFrequencies.join(',') : ''
                 }),
             });
             if (res.ok) {
@@ -492,30 +502,46 @@ const Aurora: React.FC = () => {
                                             />
                                         </div>
 
-                                        <div className="pt-2">
-                                            <p className="text-sm text-gray-400 mb-2">Report Frequency (Select multiple)</p>
-                                            <div className="flex gap-4">
-                                                {['daily', 'weekly', 'monthly'].map(freq => (
-                                                    <label key={freq} className="flex items-center gap-2 cursor-pointer">
-                                                        <input 
-                                                            type="checkbox"
-                                                            checked={frequencies.includes(freq)}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) {
-                                                                    setFrequencies([...frequencies, freq]);
-                                                                } else {
-                                                                    // ensure at least one is selected
-                                                                    if (frequencies.length > 1) {
-                                                                        setFrequencies(frequencies.filter(f => f !== freq));
-                                                                    }
-                                                                }
-                                                            }}
-                                                            className="w-4 h-4 accent-blue-500"
-                                                        />
-                                                        <span className="text-sm text-gray-300 capitalize">{freq}</span>
-                                                    </label>
-                                                ))}
+                                        <div className="pt-4 border-t border-white/10">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <label className="text-sm font-medium text-white">Enable Automated Email Reports</label>
+                                                <button 
+                                                    onClick={() => setSendEmailToggle(!sendEmailToggle)}
+                                                    className={`w-12 h-6 rounded-full transition-colors relative ${sendEmailToggle ? 'bg-blue-500' : 'bg-white/20'}`}
+                                                >
+                                                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${sendEmailToggle ? 'left-7' : 'left-1'}`} />
+                                                </button>
                                             </div>
+
+                                            {sendEmailToggle && (
+                                                <div className="space-y-4 bg-white/5 p-4 rounded-xl border border-white/10 animate-in fade-in slide-in-from-top-2">
+                                                    <div>
+                                                        <p className="text-sm text-gray-400 mb-2">Report Frequency (Select multiple)</p>
+                                                        <div className="flex gap-4">
+                                                            {['daily', 'weekly', 'monthly'].map(freq => (
+                                                                <label key={freq} className="flex items-center gap-2 cursor-pointer">
+                                                                    <input 
+                                                                        type="checkbox"
+                                                                        checked={frequencies.includes(freq)}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                setFrequencies([...frequencies, freq]);
+                                                                            } else {
+                                                                                // ensure at least one is selected
+                                                                                if (frequencies.length > 1) {
+                                                                                    setFrequencies(frequencies.filter(f => f !== freq));
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        className="w-4 h-4 accent-blue-500"
+                                                                    />
+                                                                    <span className="text-sm text-gray-300 capitalize">{freq}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="pt-2">
@@ -694,29 +720,45 @@ const Aurora: React.FC = () => {
                                             />
                                         </div>
 
-                                        <div className="pt-2">
-                                            <p className="text-sm text-gray-400 mb-2">Report Frequency (Select multiple)</p>
-                                            <div className="flex gap-4">
-                                                {['daily', 'weekly', 'monthly'].map(freq => (
-                                                    <label key={`edit-${freq}`} className="flex items-center gap-2 cursor-pointer">
-                                                        <input 
-                                                            type="checkbox"
-                                                            checked={editFrequencies.includes(freq)}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) {
-                                                                    setEditFrequencies([...editFrequencies, freq]);
-                                                                } else {
-                                                                    if (editFrequencies.length > 1) {
-                                                                        setEditFrequencies(editFrequencies.filter(f => f !== freq));
-                                                                    }
-                                                                }
-                                                            }}
-                                                            className="w-4 h-4 accent-blue-500"
-                                                        />
-                                                        <span className="text-sm text-gray-300 capitalize">{freq}</span>
-                                                    </label>
-                                                ))}
+                                        <div className="pt-4 border-t border-white/10">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <label className="text-sm font-medium text-white">Enable Automated Email Reports</label>
+                                                <button 
+                                                    onClick={() => setEditSendEmailToggle(!editSendEmailToggle)}
+                                                    className={`w-12 h-6 rounded-full transition-colors relative ${editSendEmailToggle ? 'bg-blue-500' : 'bg-white/20'}`}
+                                                >
+                                                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${editSendEmailToggle ? 'left-7' : 'left-1'}`} />
+                                                </button>
                                             </div>
+
+                                            {editSendEmailToggle && (
+                                                <div className="space-y-4 bg-white/5 p-4 rounded-xl border border-white/10 animate-in fade-in slide-in-from-top-2">
+                                                    <div>
+                                                        <p className="text-sm text-gray-400 mb-2">Report Frequency (Select multiple)</p>
+                                                        <div className="flex gap-4">
+                                                            {['daily', 'weekly', 'monthly'].map(freq => (
+                                                                <label key={`edit-${freq}`} className="flex items-center gap-2 cursor-pointer">
+                                                                    <input 
+                                                                        type="checkbox"
+                                                                        checked={editFrequencies.includes(freq)}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                setEditFrequencies([...editFrequencies, freq]);
+                                                                            } else {
+                                                                                if (editFrequencies.length > 1) {
+                                                                                    setEditFrequencies(editFrequencies.filter(f => f !== freq));
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        className="w-4 h-4 accent-blue-500"
+                                                                    />
+                                                                    <span className="text-sm text-gray-300 capitalize">{freq}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

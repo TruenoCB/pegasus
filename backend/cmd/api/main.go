@@ -132,6 +132,7 @@ func main() {
 			protected.POST("/social/posts/:id/comment", socialHandler.CommentPost)
 			protected.GET("/social/users", socialHandler.GetUsers)
 			protected.GET("/social/users/:id", socialHandler.GetUser)
+			protected.GET("/social/users/:id/followers", socialHandler.GetFollowers)
 			protected.POST("/social/follow/:id", socialHandler.ToggleFollow)
 			protected.GET("/social/users/:id/stats", socialHandler.GetProfileStats)
 			protected.GET("/social/users/me/assets", socialHandler.GetUserAssets)

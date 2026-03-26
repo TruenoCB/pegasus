@@ -218,9 +218,9 @@ const Social: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
       {/* Left Sidebar - Profile & Trends */}
-      <aside className="hidden md:block w-64 space-y-6">
+      <aside className="hidden lg:block w-64 shrink-0 space-y-6">
         <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
           <div className="flex flex-col items-center text-center">
             <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-xl font-bold mb-4 overflow-hidden">
@@ -425,7 +425,7 @@ const Social: React.FC = () => {
       </main>
 
       {/* Right Sidebar - Suggestions */}
-      <aside className="hidden lg:block w-80 space-y-6">
+      <aside className="hidden lg:block w-80 shrink-0 space-y-6">
         <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
           <h4 className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-500">Find Network Nodes</h4>
           <div className="relative mb-4">

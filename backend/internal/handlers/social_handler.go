@@ -178,6 +178,21 @@ func (h *SocialHandler) GetUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, users)
 }
 
+func (h *SocialHandler) GetFollowers(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "me" {
+		userID = c.GetString("user_id")
+	}
+	currentUserID := c.GetString("user_id")
+
+	followers, err := h.socialService.GetFollowers(userID, currentUserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, followers)
+}
+
 func (h *SocialHandler) GetUser(c *gin.Context) {
 	userID := c.Param("id")
 	if userID == "me" {
