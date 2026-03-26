@@ -429,7 +429,8 @@ const Aurora: React.FC = () => {
                                     <h3 className="text-xl font-bold mb-2 cursor-pointer" onClick={() => {
                                         setSelectedUrls(prev => prev.includes(feed.url) ? prev.filter(u => u !== feed.url) : [...prev, feed.url]);
                                     }}>{feed.name}</h3>
-                                    <div className="text-xs text-gray-500 mb-4">{feed.subscribers} subscribers</div>
+                                    <div className="text-[10px] text-gray-500 mb-1 truncate" title={feed.url}>{feed.url}</div>
+                                    <div className="text-xs text-gray-400 mb-4 font-medium">{feed.subscribers} subscribers</div>
                                     <button 
                                         onClick={() => {
                                             setSelectedUrls([feed.url]);
