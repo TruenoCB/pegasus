@@ -80,6 +80,7 @@ type AISummary struct {
 	ContentHash     string    `gorm:"uniqueIndex;type:varchar(64);not null" json:"content_hash"`
 	OriginalTitle   string    `gorm:"type:varchar(255)" json:"original_title"`
 	OriginalContent string    `gorm:"type:text" json:"original_content"`
+	Link            string    `gorm:"type:varchar(500)" json:"link"` // Added Link field
 	Summary         string    `gorm:"type:text" json:"summary"`
 	KeyPoints       string    `gorm:"type:json" json:"key_points"`
 	Language        string    `gorm:"type:varchar(10);default:'zh'" json:"language"`

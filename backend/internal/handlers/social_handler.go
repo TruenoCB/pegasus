@@ -163,13 +163,14 @@ func (h *SocialHandler) GetMessages(c *gin.Context) {
 func (h *SocialHandler) GetUsers(c *gin.Context) {
 	query := c.Query("q")
 	mutualOnly := c.Query("mutual") == "true"
+	currentUserID := c.GetString("user_id")
 	
 	mutualWithUserID := ""
 	if mutualOnly {
-		mutualWithUserID = c.GetString("user_id")
+		mutualWithUserID = currentUserID
 	}
 
-	users, err := h.socialService.GetUsers(query, mutualWithUserID)
+	users, err := h.socialService.GetUsers(query, mutualWithUserID, currentUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -81,7 +81,7 @@ func (s *RSSService) GetUserGroups(userID string) ([]models.RSSGroup, error) {
 	return groups, err
 }
 
-func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, promptConfig string, emailPromptConfig string) error {
+func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, emails []string, promptConfig string, emailPromptConfig string) error {
 	var group models.RSSGroup
 
 	// First check if the group exists and belongs to the user
@@ -94,6 +94,7 @@ func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, pr
 	}
 
 	urlsJson, _ := json.Marshal(urls)
+	emailsJson, _ := json.Marshal(emails)
 
 	// Update both Asset and Group
 	s.db.Model(&models.Asset{}).Where("id = ?", group.AssetID).Updates(map[string]interface{}{
@@ -103,6 +104,7 @@ func (s *RSSService) UpdateGroup(userID, groupID, name string, urls []string, pr
 	return s.db.Model(&group).Updates(map[string]interface{}{
 		"name":                name,
 		"feed_configs":        string(urlsJson),
+		"notification_emails": string(emailsJson),
 		"prompt_config":       promptConfig,
 		"email_prompt_config": emailPromptConfig,
 	}).Error
@@ -165,6 +167,7 @@ func (s *RSSService) FetchAndParse(url string) (*models.RSSFeed, []models.AISumm
 		items = append(items, models.AISummary{
 			OriginalTitle:   item.Title,
 			OriginalContent: item.Description + "\n" + item.Content,
+			Link:            item.Link,
 		})
 	}
 
@@ -207,6 +210,7 @@ func (s *RSSService) FetchAndSave(url string) error {
 			ContentHash:     hash,
 			OriginalTitle:   item.Title,
 			OriginalContent: content,
+			Link:            item.Link,
 			CreatedAt:       time.Now(), // or item.PublishedParsed if available
 		}
 		if item.PublishedParsed != nil {

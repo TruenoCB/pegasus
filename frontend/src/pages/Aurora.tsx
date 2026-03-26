@@ -35,6 +35,7 @@ const Aurora: React.FC = () => {
     const [editingGroup, setEditingGroup] = useState<any | null>(null);
     const [editGroupName, setEditGroupName] = useState('');
     const [editGroupUrls, setEditGroupUrls] = useState('');
+    const [editGroupEmails, setEditGroupEmails] = useState('');
     const [editGroupPrompt, setEditGroupPrompt] = useState('');
     const [editGroupEmailPrompt, setEditGroupEmailPrompt] = useState('');
     const [savingGroup, setSavingGroup] = useState(false);
@@ -240,6 +241,12 @@ const Aurora: React.FC = () => {
             setEditGroupUrls(urls.join('\n'));
         } catch {
             setEditGroupUrls('');
+        }
+        try {
+            const emails = JSON.parse(group.notification_emails || '[]');
+            setEditGroupEmails(emails.join(', '));
+        } catch {
+            setEditGroupEmails('');
         }
         setEditGroupPrompt(group.prompt_config || '');
         setEditGroupEmailPrompt(group.email_prompt_config || '');
@@ -651,6 +658,17 @@ const Aurora: React.FC = () => {
                                                 value={editGroupUrls}
                                                 onChange={e => setEditGroupUrls(e.target.value)}
                                                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 h-32 resize-none"
+                                            />
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Notification Emails</label>
+                                            <input 
+                                                type="text"
+                                                value={editGroupEmails}
+                                                onChange={e => setEditGroupEmails(e.target.value)}
+                                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-white/30 text-sm"
+                                                placeholder="Comma separated emails..."
                                             />
                                         </div>
 

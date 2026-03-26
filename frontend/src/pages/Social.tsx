@@ -70,17 +70,33 @@ const Social: React.FC = () => {
     }
   };
 
+  const [users, setUsers] = useState<any[]>([]);
+
   const fetchUsers = async () => {
     try {
-      const res = await fetch('/api/chat/users', {
+      const res = await fetch('/api/social/users', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        const data = await res.json();
-        setSuggestedUsers(data.filter((u: any) => u.id !== user?.id).slice(0, 5));
+        setUsers(await res.json());
       }
     } catch (error) {
       console.error("Failed to fetch users", error);
+    }
+  };
+
+  const handleFollowToggle = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/social/follow/${userId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchUsers();
+        fetchStats();
+      }
+    } catch (error) {
+      console.error("Failed to toggle follow", error);
     }
   };
 
@@ -409,7 +425,7 @@ const Social: React.FC = () => {
       </main>
 
       {/* Right Sidebar - Suggestions */}
-      <aside className="hidden lg:block w-64 space-y-6">
+      <aside className="hidden lg:block w-80 space-y-6">
         <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
           <h4 className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-500">Find Network Nodes</h4>
           <div className="relative mb-4">
@@ -439,10 +455,10 @@ const Social: React.FC = () => {
                     <div className="text-[10px] text-gray-500 truncate">{person.email}</div>
                   </div>
                   <button 
-                    onClick={() => handleFollow(person.id)}
-                    className="text-xs font-bold text-blue-400 hover:underline"
+                    onClick={() => handleFollowToggle(person.id)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${person.is_following ? 'bg-transparent border border-white/20 text-white hover:border-red-500 hover:text-red-500' : 'bg-white text-black hover:bg-gray-200'}`}
                   >
-                    Follow
+                    {person.is_following ? 'Following' : 'Follow'}
                   </button>
                 </div>
               ))
@@ -451,7 +467,7 @@ const Social: React.FC = () => {
             ) : (
               <>
                 <p className="text-xs text-gray-500 mb-2 font-medium">Suggested for you</p>
-                {suggestedUsers.map((person) => (
+                {users.slice(0, 5).map((person) => (
                   <div key={person.id} className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-gray-800 rounded-lg flex items-center justify-center text-xs font-bold uppercase overflow-hidden">
                       {person.avatar_url ? <img src={person.avatar_url} className="w-full h-full object-cover" /> : person.name?.substring(0, 2) || 'U'}
@@ -461,10 +477,10 @@ const Social: React.FC = () => {
                       <div className="text-[10px] text-gray-500 truncate">{person.email}</div>
                     </div>
                     <button 
-                      onClick={() => handleFollow(person.id)}
-                      className="text-xs font-bold text-blue-400 hover:underline"
+                      onClick={() => handleFollowToggle(person.id)}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${person.is_following ? 'bg-transparent border border-white/20 text-white hover:border-red-500 hover:text-red-500' : 'bg-white text-black hover:bg-gray-200'}`}
                     >
-                      Follow
+                      {person.is_following ? 'Following' : 'Follow'}
                     </button>
                   </div>
                 ))}

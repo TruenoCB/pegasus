@@ -142,7 +142,12 @@ func (s *SocialService) GetMessages(user1, user2 string, limit, offset int) ([]m
 	return messages, err
 }
 
-func (s *SocialService) GetUsers(query string, mutualWithUserID string) ([]models.User, error) {
+type UserWithFollowStatus struct {
+	models.User
+	IsFollowing bool `json:"is_following"`
+}
+
+func (s *SocialService) GetUsers(query string, mutualWithUserID string, currentUserID string) ([]UserWithFollowStatus, error) {
 	var users []models.User
 	dbQuery := s.db.Select("id", "name", "email", "avatar_url")
 
@@ -155,8 +160,27 @@ func (s *SocialService) GetUsers(query string, mutualWithUserID string) ([]model
 	if query != "" {
 		dbQuery = dbQuery.Where("name LIKE ? OR email LIKE ?", "%"+query+"%", "%"+query+"%")
 	}
-	err := dbQuery.Find(&users).Error
-	return users, err
+	
+	// Exclude current user
+	if currentUserID != "" {
+		dbQuery = dbQuery.Where("users.id != ?", currentUserID)
+	}
+	
+	err := dbQuery.Limit(50).Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+
+	var result []UserWithFollowStatus
+	for _, u := range users {
+		isFollowing := false
+		if currentUserID != "" {
+			s.db.Model(&models.SocialRelation{}).Where("follower_id = ? AND following_id = ? AND type = 'follow'", currentUserID, u.ID).Select("count(*) > 0").Find(&isFollowing)
+		}
+		result = append(result, UserWithFollowStatus{User: u, IsFollowing: isFollowing})
+	}
+
+	return result, nil
 }
 
 func (s *SocialService) GetUserByID(userID string) (*models.User, error) {

@@ -101,19 +101,33 @@ func (s *ReportService) GenerateReport(groupID string, reportType string) (*mode
 		return nil, fmt.Errorf("no items found for report")
 	}
 
-	// 4. Aggregate Content
+	// 4. Map Phase: Summarize individual items if daily (to avoid token limit)
 	var contentBuilder strings.Builder
 	contentBuilder.WriteString(fmt.Sprintf("Report for %s (%s)\n\n", group.Name, reportType))
-	for _, item := range items {
-		contentBuilder.WriteString(fmt.Sprintf("- %s\n%s\n\n", item.OriginalTitle, item.OriginalContent))
+	
+	if reportType == "daily" {
+		for _, item := range items {
+			// individual map summary
+			mapPrompt := "Please summarize the core points of the following text in 50-100 words."
+			itemSummary, err := s.aiService.GenerateReport(item.OriginalContent, mapPrompt)
+			if err != nil {
+				// fallback to original if map fails
+				if len(item.OriginalContent) > 300 {
+					itemSummary = item.OriginalContent[:300] + "..."
+				} else {
+					itemSummary = item.OriginalContent
+				}
+			}
+			contentBuilder.WriteString(fmt.Sprintf("- %s\n%s\n\n", item.OriginalTitle, itemSummary))
+		}
+	} else {
+		for _, item := range items {
+			contentBuilder.WriteString(fmt.Sprintf("- %s\n%s\n\n", item.OriginalTitle, item.OriginalContent))
+		}
 	}
 
-	// 5. AI Summarize
-	// Truncate if too long (simple approach)
+	// 5. Reduce Phase: AI Summarize
 	fullContent := contentBuilder.String()
-	if len(fullContent) > 10000 {
-		fullContent = fullContent[:10000] + "...(truncated)"
-	}
 
 	summary, err := s.aiService.Summarize(fullContent, "zh") // Default to Chinese
 	if err != nil {

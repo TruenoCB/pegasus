@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"pegasus/internal/models"
 	"pegasus/internal/services"
+	"regexp"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -141,28 +145,63 @@ type GenerateGroupReportRequest struct {
 	SendEmail bool   `json:"send_email"`
 }
 
+type UpdateGroupRequest struct {
+	Name              string   `json:"name" binding:"required"`
+	URLs              []string `json:"urls" binding:"required"`
+	Emails            []string `json:"emails"`
+	PromptConfig      string   `json:"prompt_config"`
+	EmailPromptConfig string   `json:"email_prompt_config"`
+}
+
 func (h *RSSHandler) UpdateGroup(c *gin.Context) {
 	userID := c.GetString("user_id")
 	groupID := c.Param("id")
 
-	var req struct {
-		Name              string   `json:"name" binding:"required"`
-		URLs              []string `json:"urls" binding:"required"`
-		PromptConfig      string   `json:"prompt_config"`
-		EmailPromptConfig string   `json:"email_prompt_config"`
-	}
+	var req UpdateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err := h.rssService.UpdateGroup(userID, groupID, req.Name, req.URLs, req.PromptConfig, req.EmailPromptConfig)
+	err := h.rssService.UpdateGroup(userID, groupID, req.Name, req.URLs, req.Emails, req.PromptConfig, req.EmailPromptConfig)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
+func fetchArticleText(url string) string {
+	if url == "" {
+		return ""
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	// Read a limited amount of bytes to prevent memory issues
+	bodyBytes := make([]byte, 1024*100) // max 100KB
+	n, _ := resp.Body.Read(bodyBytes)
+	html := string(bodyBytes[:n])
+
+	// very naive HTML strip
+	re := regexp.MustCompile(`(?s)<script.*?>.*?</script>|<style.*?>.*?</style>|<[^>]+>`)
+	text := re.ReplaceAllString(html, " ")
+
+	// collapse whitespace
+	reSpace := regexp.MustCompile(`\s+`)
+	text = reSpace.ReplaceAllString(text, " ")
+
+	text = strings.TrimSpace(text)
+
+	if len(text) > 4000 {
+		text = text[:4000] // limit to 4000 chars per article to avoid massive tokens
+	}
+	return text
 }
 
 func (h *RSSHandler) GenerateGroupReport(c *gin.Context) {
@@ -196,22 +235,58 @@ func (h *RSSHandler) GenerateGroupReport(c *gin.Context) {
 			return
 		}
 
-		var allItemsContent string
+		type itemSummary struct {
+			title   string
+			summary string
+		}
+		var summaries []itemSummary
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+
 		for _, url := range urls {
 			_, items, err := h.rssService.FetchAndParse(url)
 			if err == nil {
 				for _, item := range items {
-					// Only take the first 500 chars to avoid huge context
-					content := item.OriginalContent
-					if len(content) > 500 {
-						content = content[:500] + "..."
-					}
-					allItemsContent += fmt.Sprintf("Title: %s\nContent: %s\n\n", item.OriginalTitle, content)
+					wg.Add(1)
+					go func(it models.AISummary) {
+						defer wg.Done()
+
+						// Map phase: Fetch linked content
+						text := fetchArticleText(it.Link)
+						if text == "" {
+							text = it.OriginalContent
+						}
+						if len(text) > 4000 {
+							text = text[:4000]
+						}
+
+						// Summarize individual article
+						mapPrompt := "Please summarize the core points of the following article in 100-150 words. Focus on the most important facts."
+						summary, err := h.aiService.GenerateReport(text, mapPrompt)
+						if err != nil {
+							// fallback
+							if len(text) > 300 {
+								summary = text[:300] + "..."
+							} else {
+								summary = text
+							}
+						}
+
+						mu.Lock()
+						summaries = append(summaries, itemSummary{title: it.OriginalTitle, summary: summary})
+						mu.Unlock()
+					}(item)
 				}
 			}
 		}
+		wg.Wait()
 
-		// 3. Generate AI Report using prompt config
+		var allItemsContent string
+		for _, s := range summaries {
+			allItemsContent += fmt.Sprintf("Title: %s\nSummary: %s\n\n", s.title, s.summary)
+		}
+
+		// 3. Reduce phase: Generate AI Report using prompt config
 		reportContent, err := h.aiService.GenerateReport(allItemsContent, group.PromptConfig)
 		if err != nil {
 			return
