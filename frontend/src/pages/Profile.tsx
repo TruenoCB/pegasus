@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { User, Settings, Shield, Award, Globe, Mail, Link as LinkIcon, Edit3, Zap, LogOut, X, Loader2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import AssetViewerModal from '../components/AssetViewerModal';
 
@@ -238,7 +238,7 @@ const Profile: React.FC = () => {
                         {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : u.name.substring(0, 2).toUpperCase()}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold truncate max-w-[100px]">{u.name}</span>
+                        <Link to={`/profile/${u.id}`} className="text-sm font-bold truncate max-w-[100px] hover:underline">{u.name}</Link>
                         <span className="text-[10px] text-gray-500 truncate max-w-[100px]">@{u.email.split('@')[0]}</span>
                       </div>
                     </div>
@@ -269,7 +269,7 @@ const Profile: React.FC = () => {
                         {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : u.name.substring(0, 2).toUpperCase()}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold truncate max-w-[100px]">{u.name}</span>
+                        <Link to={`/profile/${u.id}`} className="text-sm font-bold truncate max-w-[100px] hover:underline">{u.name}</Link>
                         <span className="text-[10px] text-gray-500 truncate max-w-[100px]">@{u.email.split('@')[0]}</span>
                       </div>
                     </div>

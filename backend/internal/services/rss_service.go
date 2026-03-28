@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -155,13 +156,14 @@ func (s *RSSService) GetSummaryReports(userID string) ([]models.SummaryReport, e
 }
 
 func (s *RSSService) FetchAndParse(url string) (*models.RSSFeed, []models.AISummary, error) {
-	feed, err := s.fp.ParseURL(url)
+	cleanURL := strings.TrimSpace(strings.ReplaceAll(url, "`", ""))
+	feed, err := s.fp.ParseURL(cleanURL)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	rssFeed := &models.RSSFeed{
-		URL:         url,
+		URL:         cleanURL,
 		Title:       feed.Title,
 		Description: feed.Description,
 		LastFetch:   time.Now(),
@@ -179,17 +181,19 @@ func (s *RSSService) FetchAndParse(url string) (*models.RSSFeed, []models.AISumm
 	return rssFeed, items, nil
 }
 func (s *RSSService) FetchAndSave(url string) error {
-	feed, err := s.fp.ParseURL(url)
+	cleanURL := strings.TrimSpace(strings.ReplaceAll(url, "`", ""))
+	feed, err := s.fp.ParseURL(cleanURL)
 	if err != nil {
 		return err
 	}
 
 	rssFeed := models.RSSFeed{
-		ID:  uuid.New().String(),
-		URL: url,
+		ID:        uuid.New().String(),
+		URL:       cleanURL,
+		LastFetch: time.Now(),
 	}
 	// Find or create feed
-	if err := s.db.Where("url = ?", url).FirstOrCreate(&rssFeed).Error; err != nil {
+	if err := s.db.Where("url = ?", cleanURL).FirstOrCreate(&rssFeed).Error; err != nil {
 		return err
 	}
 
