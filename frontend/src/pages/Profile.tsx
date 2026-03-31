@@ -81,30 +81,30 @@ const Profile: React.FC = () => {
         }
 
         // Fetch following users list to manage followings
-        if (!id || id === currentUser?.id) {
-          const usersRes = await fetch('/api/social/users', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (usersRes.ok) {
-            const allUsers = await usersRes.json();
-            setFollowingUsers(allUsers.filter((u: any) => u.is_following));
-          }
+        const usersRes = await fetch(`/api/social/users${(!id || id === currentUser?.id) ? '' : `?target_user_id=${currentTargetId}`}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (usersRes.ok) {
+          const allUsers = await usersRes.json();
+          // If viewing own profile, filter by is_following. If viewing someone else's, the backend should return their followings.
+          // For simplicity in this demo, we'll fetch followers/following for any user.
+          setFollowingUsers(allUsers.filter((u: any) => u.is_following)); // This requires backend update to handle target_user_id for follow status
+        }
 
-          // Fetch followers list
-          const followersRes = await fetch('/api/social/users/me/followers', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (followersRes.ok) {
-            setFollowerUsers(await followersRes.json());
-          }
+        // Fetch followers list
+        const followersRes = await fetch(`/api/social/users/${currentTargetId}/followers`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (followersRes.ok) {
+          setFollowerUsers(await followersRes.json());
+        }
 
-          // Fetch saved assets
-          const savedRes = await fetch('/api/social/assets/saved', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (savedRes.ok) {
-            setSavedAssets(await savedRes.json());
-          }
+        // Fetch saved assets for the current profile owner
+        const savedRes = await fetch(`/api/social/assets/saved${(!id || id === currentUser?.id) ? '' : `?user_id=${currentTargetId}`}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (savedRes.ok) {
+          setSavedAssets(await savedRes.json());
         }
       } catch (error) {
         console.error("Failed to fetch profile data", error);
