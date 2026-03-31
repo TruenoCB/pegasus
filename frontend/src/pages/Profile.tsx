@@ -10,7 +10,6 @@ const Profile: React.FC = () => {
   const { user: currentUser, token, logout, login } = useAuthStore();
   const navigate = useNavigate();
   const isMe = !id || id === currentUser?.id;
-  const targetUserId = isMe ? currentUser?.id : id;
 
   const [user, setUser] = useState<any>(isMe ? currentUser : null);
   const [stats, setStats] = useState({ posts: 0, following: 0, followers: 0 });
@@ -34,19 +33,24 @@ const Profile: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!token || !targetUserId) return;
+      // Re-evaluate targetUserId when id changes
+      const currentTargetId = !id || id === currentUser?.id ? currentUser?.id : id;
+      if (!token || !currentTargetId) return;
+      
       try {
         // Fetch user info if not me
-        if (!isMe) {
-          const userRes = await fetch(`/api/social/users/${targetUserId}`, {
+        if (id && id !== currentUser?.id) {
+          const userRes = await fetch(`/api/social/users/${currentTargetId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           if (userRes.ok) {
             setUser(await userRes.json());
           }
+        } else {
+          setUser(currentUser);
         }
 
-        const statsRes = await fetch(`/api/social/users/${targetUserId}/stats`, {
+        const statsRes = await fetch(`/api/social/users/${currentTargetId}/stats`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (statsRes.ok) {
@@ -64,10 +68,10 @@ const Profile: React.FC = () => {
         });
         if (postsRes.ok) {
           const allPosts = await postsRes.json();
-          setPosts(allPosts.filter((p: any) => p.user_id === targetUserId));
+          setPosts(allPosts.filter((p: any) => p.user_id === currentTargetId));
         }
 
-        const assetsRes = await fetch(`/api/social/users/${isMe ? 'me' : targetUserId}/assets`, {
+        const assetsRes = await fetch(`/api/social/users/${(!id || id === currentUser?.id) ? 'me' : currentTargetId}/assets`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (assetsRes.ok) {
@@ -77,7 +81,7 @@ const Profile: React.FC = () => {
         }
 
         // Fetch following users list to manage followings
-        if (isMe) {
+        if (!id || id === currentUser?.id) {
           const usersRes = await fetch('/api/social/users', {
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -107,7 +111,7 @@ const Profile: React.FC = () => {
       }
     };
     fetchData();
-  }, [token, targetUserId, isMe]);
+  }, [token, id, currentUser]);
 
   const handleUnfollow = async (userId: string) => {
     try {
