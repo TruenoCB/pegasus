@@ -69,7 +69,7 @@ type CommentRequest struct {
 func (h *SocialHandler) CommentPost(c *gin.Context) {
 	userID := c.GetString("user_id")
 	postID := c.Param("id")
-	
+
 	var req CommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -110,7 +110,10 @@ func (h *SocialHandler) GetUserAssets(c *gin.Context) {
 }
 
 func (h *SocialHandler) GetSavedAssets(c *gin.Context) {
-	userID := c.GetString("user_id")
+	userID := c.Query("user_id")
+	if userID == "" {
+		userID = c.GetString("user_id")
+	}
 
 	assets, err := h.socialService.GetSavedAssets(userID)
 	if err != nil {
@@ -133,7 +136,7 @@ func (h *SocialHandler) ToggleSaveAsset(c *gin.Context) {
 
 func (h *SocialHandler) GetAssetDetails(c *gin.Context) {
 	assetID := c.Param("id")
-	
+
 	assetDetails, err := h.socialService.GetAssetDetails(assetID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found or details unavailable"})
@@ -200,7 +203,7 @@ func (h *SocialHandler) GetUsers(c *gin.Context) {
 	query := c.Query("q")
 	mutualOnly := c.Query("mutual") == "true"
 	currentUserID := c.GetString("user_id")
-	
+
 	mutualWithUserID := ""
 	if mutualOnly {
 		mutualWithUserID = currentUserID

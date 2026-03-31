@@ -268,7 +268,7 @@ func (s *SocialService) GetFollowers(userID string, currentUserID string) ([]Use
 
 func (s *SocialService) GetUserByID(userID string) (*models.User, error) {
 	var user models.User
-	err := s.db.Select("id", "name", "email", "avatar_url", "bio").Where("id = ?", userID).First(&user).Error
+	err := s.db.Select("id", "name", "email", "avatar_url", "bio", "location", "website").Where("id = ?", userID).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
