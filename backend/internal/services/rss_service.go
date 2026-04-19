@@ -157,6 +157,8 @@ func (s *RSSService) GetSummaryReports(userID string) ([]models.SummaryReport, e
 
 func (s *RSSService) FetchAndParse(url string) (*models.RSSFeed, []models.AISummary, error) {
 	cleanURL := strings.TrimSpace(strings.ReplaceAll(url, "`", ""))
+	cleanURL = strings.TrimSpace(strings.ReplaceAll(cleanURL, "'", ""))
+
 	feed, err := s.fp.ParseURL(cleanURL)
 	if err != nil {
 		return nil, nil, err
@@ -182,27 +184,46 @@ func (s *RSSService) FetchAndParse(url string) (*models.RSSFeed, []models.AISumm
 }
 func (s *RSSService) FetchAndSave(url string) error {
 	cleanURL := strings.TrimSpace(strings.ReplaceAll(url, "`", ""))
+	cleanURL = strings.TrimSpace(strings.ReplaceAll(cleanURL, "'", ""))
+
 	feed, err := s.fp.ParseURL(cleanURL)
 	if err != nil {
 		return err
 	}
 
-	rssFeed := models.RSSFeed{
-		ID:        uuid.New().String(),
-		URL:       cleanURL,
-		LastFetch: time.Now(),
-	}
-	// Find or create feed
-	if err := s.db.Where("url = ?", cleanURL).FirstOrCreate(&rssFeed).Error; err != nil {
-		return err
+	var rssFeed models.RSSFeed
+	// Find or create feed using cleanURL consistently
+	err = s.db.Where("url = ?", cleanURL).First(&rssFeed).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			rssFeed = models.RSSFeed{
+				ID:          uuid.New().String(),
+				URL:         cleanURL,
+				Title:       feed.Title,
+				Description: feed.Description,
+				LastFetch:   time.Now(),
+			}
+			if err := s.db.Create(&rssFeed).Error; err != nil {
+				// Handle potential race condition on unique index
+				if strings.Contains(err.Error(), "Duplicate entry") {
+					// Fallback to querying it if another goroutine created it
+					s.db.Where("url = ?", cleanURL).First(&rssFeed)
+				} else {
+					return err
+				}
+			}
+		} else {
+			return err
+		}
+	} else {
+		// Update existing feed metadata
+		rssFeed.Title = feed.Title
+		rssFeed.Description = feed.Description
+		rssFeed.LastFetch = time.Now()
+		s.db.Save(&rssFeed)
 	}
 
-	// Update feed metadata
-	rssFeed.Title = feed.Title
-	rssFeed.Description = feed.Description
-	rssFeed.LastFetch = time.Now()
-	s.db.Save(&rssFeed)
-
+	var newItemsCount int
 	for _, item := range feed.Items {
 		content := item.Description + "\n" + item.Content
 		hash := generateHash(item.Title + content)
@@ -226,7 +247,9 @@ func (s *RSSService) FetchAndSave(url string) error {
 			summary.CreatedAt = *item.PublishedParsed
 		}
 
-		s.db.Create(&summary)
+		if err := s.db.Create(&summary).Error; err == nil {
+			newItemsCount++
+		}
 	}
 
 	return nil

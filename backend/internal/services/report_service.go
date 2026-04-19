@@ -59,28 +59,46 @@ func (s *ReportService) GenerateReport(groupID string, reportType string) (*mode
 	// 3. Get Items
 	// Since daily, weekly, monthly are distinct scheduled runs,
 	// we will always fetch the last 24h/7d/30d of content from the database.
-	// We want to fetch items that fall within `since`, whether they were previously summarized or not, 
+	// We want to fetch items that fall within `since`, whether they were previously summarized or not,
 	// to build a comprehensive weekly/monthly report.
 	// For 'daily', we use GetUnsummarizedItems to avoid repeating same news in the same day.
 	// For 'weekly'/'monthly', we can fetch all items in that period to create an overarching summary.
-	
+
 	var items []models.AISummary
 	var emails []string
-	
+
 	if group.NotificationEmails != "" {
 		json.Unmarshal([]byte(group.NotificationEmails), &emails)
 	}
 
 	if reportType == "daily" {
-		var fetchErr error
-		items, emails, fetchErr = s.rssService.GetUnsummarizedItems(groupID, since)
-		if fetchErr != nil {
-			return nil, fetchErr
+		var urls []string
+		if err := json.Unmarshal([]byte(group.FeedConfigs), &urls); err != nil {
+			return nil, err
+		}
+		
+		// Clean URLs identically to how they are stored in DB
+		var cleanURLs []string
+		for _, u := range urls {
+			clean := strings.TrimSpace(strings.ReplaceAll(u, "`", ""))
+			clean = strings.TrimSpace(strings.ReplaceAll(clean, "'", ""))
+			cleanURLs = append(cleanURLs, clean)
+		}
+
+		var feedIDs []string
+		s.db.Model(&models.RSSFeed{}).Where("url IN ?", cleanURLs).Pluck("id", &feedIDs)
+
+		if len(feedIDs) == 0 {
+			return nil, fmt.Errorf("no matching feeds found in database for group URLs")
+		}
+
+		if err := s.db.Where("feed_id IN ? AND created_at > ?", feedIDs, since).Find(&items).Error; err != nil {
+			return nil, err
 		}
 	} else {
 		// For weekly/monthly, fetch reports that were generated within the time window
-		var oldReports []models.Report
-		if err := s.db.Where("rss_group_id = ? AND type = 'daily' AND generated_at >= ?", groupID, since).Order("generated_at desc").Find(&oldReports).Error; err != nil {
+		var oldReports []models.SummaryReport
+		if err := s.db.Where("group_id = ? AND created_at >= ?", groupID, since).Order("created_at desc").Find(&oldReports).Error; err != nil {
 			return nil, err
 		}
 
@@ -91,7 +109,7 @@ func (s *ReportService) GenerateReport(groupID string, reportType string) (*mode
 		// Convert old reports into mock items for summarization
 		for _, r := range oldReports {
 			items = append(items, models.AISummary{
-				OriginalTitle:   fmt.Sprintf("Daily Report (%s)", r.GeneratedAt.Format("2006-01-02")),
+				OriginalTitle:   fmt.Sprintf("Daily Report (%s)", r.CreatedAt.Format("2006-01-02")),
 				OriginalContent: r.Content,
 			})
 		}
@@ -104,7 +122,7 @@ func (s *ReportService) GenerateReport(groupID string, reportType string) (*mode
 	// 4. Map Phase: Summarize individual items if daily (to avoid token limit)
 	var contentBuilder strings.Builder
 	contentBuilder.WriteString(fmt.Sprintf("Report for %s (%s)\n\n", group.Name, reportType))
-	
+
 	if reportType == "daily" {
 		for _, item := range items {
 			// individual map summary
